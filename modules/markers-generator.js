@@ -20,6 +20,20 @@ window.Markers = (function () {
       list: function to select candidates
       add: function to add marker legend
     */
+    //war camp ⛺
+    // monster horde 💀
+    //.  types undead
+    //          gnolls
+    //          Goblins
+    //          Raiders + Race
+    //          Orcs
+    //          Magical Beasts
+    //          Mist touched.
+    // Mythical Creatures
+    //.  Dragon
+    //.  Arch Demon
+    //.  Lich
+    //.  
     return [
       {type: "volcanoes", icon: "🌋", dx: 52, px: 13, min: 10, each: 500, multiplier: 1, list: listVolcanoes, add: addVolcano},
       {type: "hot-springs", icon: "♨️", dy: 52, min: 30, each: 1200, multiplier: 3, list: listHotSprings, add: addHotSpring},
@@ -596,6 +610,13 @@ window.Markers = (function () {
       "Cyclops",
       "Giant",
       "Monster",
+      "Mist-touched Monster",
+      "Corrupted Monster",
+      "Gnoll",
+      "Udrak",
+      "Gordat",
+      "Gorblan",
+      "Orkan",
       "Beast",
       "Dragon",
       "Undead",
