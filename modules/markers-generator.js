@@ -37,6 +37,8 @@ window.Markers = (function () {
     //🪨 🏛️ 🏗️ 🏚️ 🏰 ⛪ 🕌 🗿 ⚜️ ⚕️ 🔱 
     //mist ☁️
     // 
+    
+    //Add in fort and watch tower etc.
     return [
       {type: "volcanoes", icon: "🌋", dx: 52, px: 13, min: 10, each: 500, multiplier: 1, list: listVolcanoes, add: addVolcano},
       {type: "hot-springs", icon: "♨️", dy: 52, min: 30, each: 1200, multiplier: 3, list: listHotSprings, add: addHotSpring},
