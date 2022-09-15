@@ -242,6 +242,7 @@ window.Markers = (function () {
       wooden: 1,
       lengthy: 2,
       formidable: 2,
+      fortified: 2,
       rickety: 1,
       beaten: 1,
       weathered: 1
