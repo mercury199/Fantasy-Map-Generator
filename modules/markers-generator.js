@@ -573,8 +573,16 @@ window.Markers = (function () {
 
     // Check that the feature is a lake in case the user clicked on a wrong
     // square
+    
     if (lake.type !== "lake") return;
 
+    //Add in some options for additional monsters
+    // Hydra
+    // Kappa
+    // Nixies
+    // Rusalka
+    // Kelpie
+    // etc
     const name = `${lake.name} Monster`;
     const length = gauss(10, 5, 5, 100);
     const legend = `Rumors say a relic monster of ${length} ${heightUnit.value} long inhabits ${lake.name} Lake. Truth or lie, folks are afraid to fish in the lake`;
