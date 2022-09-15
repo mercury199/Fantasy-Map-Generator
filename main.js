@@ -1525,11 +1525,20 @@ function addZones(number = 1) {
   const {cells, states, burgs} = pack;
   const used = new Uint8Array(cells.i.length); // to store used cells
   const zonesData = [];
-
+  //war_number
+  //religion_number
+  //disease_num
+  //man_disaster_num
+  //nat_disaster_num
+  
+  //war_num
   for (let i = 0; i < rn(Math.random() * 1.8 * number); i++) addInvasion(); // invasion of enemy lands
   for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addRebels(); // rebels along a state border
+  //religion_num
   for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addProselytism(); // proselitism of organized religion
+  //religion+war or religion / war average
   for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addCrusade(); // crusade on heresy lands
+  //disease_num or man_distaster_num + disease_num or avg between two.
   for (let i = 0; i < rn(Math.random() * 1.8 * number); i++) addDisease(); // disease starting in a random city
   for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addDisaster(); // disaster starting in a random city
   for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addEruption(); // volcanic eruption aroung volcano
