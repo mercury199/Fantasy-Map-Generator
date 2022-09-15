@@ -1,2 +1,28 @@
 Content is stored in here: https://github.com/mercury199/Fantasy-Map-Generator/tree/master/modules
 
+Zones generated at line 
+1523 in https://github.com/mercury199/Fantasy-Map-Generator/blob/master/main.js
+Larger number will likely mean more zones
+
+Split numbers by type
+natural
+war
+religion
+disaster
+
+
+
+
+change the portal generation too to make some of them no longer working
+
+
+need to add fighting roaming monsters to the campaign list, along with monster incursions and etc. 
+
+
+Monster incursions / invasions to the zones. 
+
+
+Mist outbreaks in the disasters and zones. 
+
+
+Needs mosters to be added to brigands in markers. 
