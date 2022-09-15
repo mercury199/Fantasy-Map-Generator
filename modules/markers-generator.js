@@ -967,9 +967,30 @@ window.Markers = (function () {
 
     if (!cells.burg[cell]) return;
     const burgName = burgs[cells.burg[cell]].name;
+    let name_v="";
+    let legend_v="";
+    let status_v = Math.floor(Math.random() * 100); //we'll use ints
+    if(status_v < 35){
+      name_v=`${burgName} Broken Portal`;
+      legend_v=`Once an element of the magic portal system connecting major cities. These portals were installed centuries ago, but are not longer functioning.`;
+    } else if(status_v < 42){
+      name_v=`${burgName} Innactive Portal`;
+      legend_v=`Once an element of the magic portal system connecting major cities. These portals were installed centuries ago, but are not active.`;
+    } else if(status_v < 47){
+      name_v=`${burgName} Closed Portal`;
+      legend_v=`Once an element of the magic portal system connecting major cities. These portals were installed centuries ago, but are currently closed / blocked.`;
+    } else if(status_v < 65){
+      name_v=`${burgName} Unstable Portal`;
+      legend_v=`An element of the magic portal system connecting major cities. These portals were installed centuries ago, and while functioning, are limited by the number of people / material that can transit, or sometimes travelers disapear.`;
+    } else {
+      name_v=`${burgName} Portal`;
+      legend_v=`An element of the magic portal system connecting major cities. The portals were installed centuries ago, but still work fine`;
+    }
 
-    const name = `${burgName} Portal`;
-    const legend = `An element of the magic portal system connecting major cities. The portals were installed centuries ago, but still work fine`;
+    const name = name_v;
+    //`${burgName} Portal`;
+    const legend = legend_v;
+          //`An element of the magic portal system connecting major cities. The portals were installed centuries ago, but still work fine`;
     notes.push({id, name, legend});
   }
 
