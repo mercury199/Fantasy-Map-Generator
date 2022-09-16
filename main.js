@@ -1525,6 +1525,11 @@ function addZones(number = 1) {
   const {cells, states, burgs} = pack;
   const used = new Uint8Array(cells.i.length); // to store used cells
   const zonesData = [];
+  let war_number = 8;
+  let religion_number = 5;
+  let disease_number = 4;
+  let man_disaster_number = 6;
+  let nat_number=5;
   //war_number
   //religion_number
   //disease_num
@@ -1532,20 +1537,21 @@ function addZones(number = 1) {
   //nat_disaster_num
   
   //war_num
-  for (let i = 0; i < rn(Math.random() * 1.8 * number); i++) addInvasion(); // invasion of enemy lands
-  for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addRebels(); // rebels along a state border
+  for (let i = 0; i < rn(Math.random() * 1.8 * war_number); i++) addInvasion(); // invasion of enemy lands
+  for (let i = 0; i < rn(Math.random() * 1.6 * war_number); i++) addRebels(); // rebels along a state border
   //religion_num
-  for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addProselytism(); // proselitism of organized religion
+  for (let i = 0; i < rn(Math.random() * 1.6 * religion_number); i++) addProselytism(); // proselitism of organized religion
   //religion+war or religion / war average
-  for (let i = 0; i < rn(Math.random() * 1.6 * number); i++) addCrusade(); // crusade on heresy lands
+  for (let i = 0; i < rn(Math.random() * 1.6 * ((war_number*religion_number)/2)); i++) addCrusade(); // crusade on heresy lands
   //disease_num or man_distaster_num + disease_num or avg between two.
-  for (let i = 0; i < rn(Math.random() * 1.8 * number); i++) addDisease(); // disease starting in a random city
-  for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addDisaster(); // disaster starting in a random city
-  for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addEruption(); // volcanic eruption aroung volcano
-  for (let i = 0; i < rn(Math.random() * 1.0 * number); i++) addAvalanche(); // avalanche impacting highland road
-  for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addFault(); // fault line in elevated areas
-  for (let i = 0; i < rn(Math.random() * 1.4 * number); i++) addFlood(); // flood on river banks
-  for (let i = 0; i < rn(Math.random() * 1.2 * number); i++) addTsunami(); // tsunami starting near coast
+  for (let i = 0; i < rn(Math.random() * 1.8 * disease_number); i++) addDisease(); // disease starting in a random city
+  for (let i = 0; i < rn(Math.random() * 1.4 * man_disaster_number); i++) addDisaster(); // disaster starting in a random city
+  for (let i = 0; i < rn(Math.random() * 1.4 * nat_number); i++) addEruption(); // volcanic eruption aroung volcano
+  for (let i = 0; i < rn(Math.random() * 1.0 * nat_number); i++) addAvalanche(); // avalanche impacting highland road
+  for (let i = 0; i < rn(Math.random() * 1.4 * nat_number); i++) addFault(); // fault line in elevated areas
+  for (let i = 0; i < rn(Math.random() * 1.4 * nat_number); i++) addFlood(); // flood on river banks
+  for (let i = 0; i < rn(Math.random() * 1.2 * nat_number); i++) addTsunami(); // tsunami starting near coast
+
 
   drawZones();
 
