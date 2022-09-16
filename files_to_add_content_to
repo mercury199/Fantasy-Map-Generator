@@ -37,3 +37,13 @@ Configurations for the land sizw of provinces as well as the population. These s
 use the gooeycube book for guidance on how many people can live off of land. 
 
 Consider goods produced in the area, and consider the general prosperity of the province.
+
+
+
+State 
+County
+Burg
+
+Easy way to do heirarchy. 
+Need some info for the whole country to make it have a ruler as well. 
+Different government types can have different rankings for leige lords and such. 
