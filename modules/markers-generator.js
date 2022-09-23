@@ -1026,7 +1026,7 @@ window.Markers = (function () {
       "Hole" : 2,
     };
     const status = {
-      "a good spot to hid treasure" : 5,
+      "a good spot to hide treasure" : 5,
       "the home of strange monsters" : 5,
       "totally empty" : 4,
       "endlessly deep and unexplored" : 4,
