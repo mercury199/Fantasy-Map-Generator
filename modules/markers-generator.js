@@ -856,6 +856,8 @@ window.Markers = (function () {
       "Outpost",
       "Fortification",
       "Fortress",
+      "Zigguraut",
+      "Dolmen",
       "Castle"
     ];
 
