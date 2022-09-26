@@ -682,12 +682,12 @@ window.Markers = (function () {
   }
 
   function addSacredMountain(id, cell) {
-    const {cells, cultures} = pack;
+    const {cells, cultures, religions} = pack;
 
     const culture = cells.c[cell].map(c => cells.culture[c]).find(c => c);
     const name = `${Names.getCulture(culture)} Mountain`;
     const height = getFriendlyHeight(cells.p[cell]);
-    const legend = `A sacred mountain of ${cultures[culture].name} culture. Height: ${height}`;
+    const legend = `A mountain sacred to the followers of ${religions[religion].name}. Height: ${height}`;
     notes.push({id, name, legend});
   }
 
