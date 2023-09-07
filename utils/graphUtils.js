@@ -55,7 +55,8 @@ function calculateVoronoi(points, boundary) {
 
 // add points along map edge to pseudo-clip voronoi cells
 function getBoundaryPoints(width, height, spacing) {
-  const offset = rn(-1 * spacing);
+  //const offset = rn(-1 * spacing);
+  const offset = -1*spacing;
   const bSpacing = spacing * 2;
   const w = width - offset * 2;
   const h = height - offset * 2;
@@ -81,8 +82,8 @@ function getJitteredGrid(width, height, spacing) {
   const radius = spacing / 2; // square radius
   const jittering = radius * 0.9; // max deviation
   const doubleJittering = jittering * 2;
-  const jitter = () => Math.random() * doubleJittering - jittering;
-
+  //const jitter = () => Math.random() * doubleJittering - jittering;
+  const jitter = () => jittering/2;
   let points = [];
   for (let y = radius; y < height; y += spacing) {
     for (let x = radius; x < width; x += spacing) {
