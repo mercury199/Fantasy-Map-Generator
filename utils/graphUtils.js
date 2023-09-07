@@ -88,8 +88,10 @@ function getJitteredGrid(width, height, spacing) {
   let points = [];
   for (let y = radius; y < height; y += spacing) {
     for (let x = radius; x < width; x += spacing) {
-      const xj = Math.min(rn(x + jitter(), 2), width);
-      const yj = Math.min(rn(y + jitter(), 2), height);
+      //const xj = Math.min(rn(x + jitter(), 2), width);
+      const xj = Math.min(x+jitter(), width);
+      //const yj = Math.min(rn(y + jitter(), 2), height);
+      const yj = Math.min(y+jitter(),height);
       points.push([xj, yj]);
     }
   }
