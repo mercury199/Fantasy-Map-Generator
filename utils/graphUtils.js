@@ -6,7 +6,8 @@ function shouldRegenerateGrid(grid) {
   const cellsDesired = +byId("pointsInput").dataset.cells;
   if (cellsDesired !== grid.cellsDesired) return true;
 
-  const newSpacing = rn(Math.sqrt((graphWidth * graphHeight) / cellsDesired), 2);
+ // const newSpacing = rn(Math.sqrt((graphWidth * graphHeight) / cellsDesired), 2);
+  const newSpacing = Math.sqrt((graphWidth * graphHeight) / cellsDesired)
   const newCellsX = Math.floor((graphWidth + 0.5 * newSpacing - 1e-10) / newSpacing);
   const newCellsY = Math.floor((graphHeight + 0.5 * newSpacing - 1e-10) / newSpacing);
 
@@ -24,8 +25,8 @@ function generateGrid() {
 function placePoints() {
   TIME && console.time("placePoints");
   const cellsDesired = +byId("pointsInput").dataset.cells;
-  const spacing = rn(Math.sqrt((graphWidth * graphHeight) / cellsDesired), 2); // spacing between points before jirrering
-
+//  const spacing = rn(Math.sqrt((graphWidth * graphHeight) / cellsDesired), 2); // spacing between points before jirrering
+  const spacing = Math.sqrt((graphWidth * graphHeight) / cellsDesired);
   const boundary = getBoundaryPoints(graphWidth, graphHeight, spacing);
   const points = getJitteredGrid(graphWidth, graphHeight, spacing); // points of jittered square grid
   const cellsX = Math.floor((graphWidth + 0.5 * spacing - 1e-10) / spacing);
