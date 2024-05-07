@@ -1,12 +1,12 @@
-// Azgaar (azgaar.fmg@yandex.com). Minsk, 2017-2022. MIT License
+"use strict";
+// Azgaar (azgaar.fmg@yandex.com). Minsk, 2017-2023. MIT License
 // https://github.com/Azgaar/Fantasy-Map-Generator
 
-"use strict";
 // set debug options
 const PRODUCTION = location.hostname && location.hostname !== "localhost" && location.hostname !== "127.0.0.1";
 const DEBUG = localStorage.getItem("debug");
-const INFO = DEBUG || !PRODUCTION;
-const TIME = DEBUG || !PRODUCTION;
+const INFO = true;
+const TIME = true;
 const WARN = true;
 const ERROR = true;
 
@@ -29,7 +29,7 @@ if (PRODUCTION && "serviceWorker" in navigator) {
     "beforeinstallprompt",
     async event => {
       event.preventDefault();
-      const Installation = await import("./modules/dynamic/installation.js");
+      const Installation = await import("./modules/dynamic/installation.js?v=1.89.19");
       Installation.init(event);
     },
     {once: true}
@@ -82,19 +82,28 @@ let burgIcons = icons.append("g").attr("id", "burgIcons");
 let anchors = icons.append("g").attr("id", "anchors");
 let armies = viewbox.append("g").attr("id", "armies").style("display", "none");
 let markers = viewbox.append("g").attr("id", "markers");
-let fogging = viewbox.append("g").attr("id", "fogging-cont").attr("mask", "url(#fog)").append("g").attr("id", "fogging").style("display", "none");
+let fogging = viewbox
+  .append("g")
+  .attr("id", "fogging-cont")
+  .attr("mask", "url(#fog)")
+  .append("g")
+  .attr("id", "fogging")
+  .style("display", "none");
 let ruler = viewbox.append("g").attr("id", "ruler").style("display", "none");
 let debug = viewbox.append("g").attr("id", "debug");
 
-// lake and coast groups
 lakes.append("g").attr("id", "freshwater");
 lakes.append("g").attr("id", "salt");
 lakes.append("g").attr("id", "sinkhole");
 lakes.append("g").attr("id", "frozen");
 lakes.append("g").attr("id", "lava");
 lakes.append("g").attr("id", "dry");
+
 coastline.append("g").attr("id", "sea_island");
 coastline.append("g").attr("id", "lake_island");
+
+terrs.append("g").attr("id", "oceanHeights");
+terrs.append("g").attr("id", "landHeights");
 
 labels.append("g").attr("id", "states");
 labels.append("g").attr("id", "addedLabels");
@@ -119,11 +128,20 @@ emblems.append("g").attr("id", "stateEmblems");
 
 // fogging
 fogging.append("rect").attr("x", 0).attr("y", 0).attr("width", "100%").attr("height", "100%");
-fogging.append("rect").attr("x", 0).attr("y", 0).attr("width", "100%").attr("height", "100%").attr("fill", "#e8f0f6").attr("filter", "url(#splotch)");
+fogging
+  .append("rect")
+  .attr("x", 0)
+  .attr("y", 0)
+  .attr("width", "100%")
+  .attr("height", "100%")
+  .attr("fill", "#e8f0f6")
+  .attr("filter", "url(#splotch)");
 
 // assign events separately as not a viewbox child
 scaleBar.on("mousemove", () => tip("Click to open Units Editor")).on("click", () => editUnits());
-legend.on("mousemove", () => tip("Drag to change the position. Click to hide the legend")).on("click", () => clearLegend());
+legend
+  .on("mousemove", () => tip("Drag to change the position. Click to hide the legend"))
+  .on("click", () => clearLegend());
 
 // main data variables
 let grid = {}; // initial graph based on jittered square grid and data
@@ -137,7 +155,7 @@ let notes = [];
 let rulers = new Rulers();
 let customization = 0;
 
-let biomesData = applyDefaultBiomesSystem();
+let biomesData = Biomes.getDefault();
 let nameBases = Names.getNameBases(); // cultures-related data
 
 let color = d3.scaleSequential(d3.interpolateSpectral); // default color scheme
@@ -164,19 +182,23 @@ function onZoom() {
 const onZoomDebouced = debounce(onZoom, 50);
 const zoom = d3.zoom().scaleExtent([1, 20]).on("zoom", onZoomDebouced);
 
-// default options
+// default options, based on Earth data
 let options = {
   pinNotes: false,
-  showMFCGMap: true,
   winds: [225, 45, 225, 315, 135, 315],
-  stateLabelsMode: "auto"
+  temperatureEquator: 27,
+  temperatureNorthPole: -30,
+  temperatureSouthPole: -15,
+  stateLabelsMode: "auto",
+  showBurgPreview: true,
+  villageMaxPopulation: 2000
 };
+
 let mapCoordinates = {}; // map coordinates on globe
 let populationRate = +document.getElementById("populationRateInput").value;
 let distanceScale = +document.getElementById("distanceScaleInput").value;
 let urbanization = +document.getElementById("urbanizationInput").value;
 let urbanDensity = +document.getElementById("urbanDensityInput").value;
-let statesNeutral = 1; // statesEditor growth parameter
 
 applyStoredOptions();
 
@@ -189,14 +211,25 @@ let svgWidth = graphWidth;
 let svgHeight = graphHeight;
 
 landmass.append("rect").attr("x", 0).attr("y", 0).attr("width", graphWidth).attr("height", graphHeight);
-oceanPattern.append("rect").attr("fill", "url(#oceanic)").attr("x", 0).attr("y", 0).attr("width", graphWidth).attr("height", graphHeight);
-oceanLayers.append("rect").attr("id", "oceanBase").attr("x", 0).attr("y", 0).attr("width", graphWidth).attr("height", graphHeight);
+oceanPattern
+  .append("rect")
+  .attr("fill", "url(#oceanic)")
+  .attr("x", 0)
+  .attr("y", 0)
+  .attr("width", graphWidth)
+  .attr("height", graphHeight);
+oceanLayers
+  .append("rect")
+  .attr("id", "oceanBase")
+  .attr("x", 0)
+  .attr("y", 0)
+  .attr("width", graphWidth)
+  .attr("height", graphHeight);
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!location.hostname) {
     const wiki = "https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Run-FMG-locally";
-    alertMessage.innerHTML = /* html */ `Fantasy Map Generator cannot run serverless. Follow the <a href="${wiki}" target="_blank">instructions</a> on how you can
-      easily run a local web-server`;
+    alertMessage.innerHTML = /* html */ `Fantasy Map Generator cannot run serverless. Follow the <a href="${wiki}" target="_blank">instructions</a> on how you can easily run a local web-server`;
 
     $("#alert").dialog({
       resizable: false,
@@ -214,6 +247,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await checkLoadParameters();
   }
   restoreDefaultEvents(); // apply default viewbox events
+  initiateAutosave();
 });
 
 function hideLoading() {
@@ -233,7 +267,7 @@ async function checkLoadParameters() {
   const url = new URL(window.location.href);
   const params = url.searchParams;
 
-  // of there is a valid maplink, try to load .map file from URL
+  // of there is a valid maplink, try to load .map/.gz file from URL
   if (params.get("maplink")) {
     WARN && console.warn("Load map from URL");
     const maplink = params.get("maplink");
@@ -254,43 +288,31 @@ async function checkLoadParameters() {
     return;
   }
 
-  // open latest map if option is active and map is stored
-  const loadLastMap = () =>
-    new Promise((resolve, reject) => {
-      ldb.get("lastMap", blob => {
-        if (blob) {
-          WARN && console.warn("Load last saved map");
-          try {
-            uploadMap(blob);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        } else {
-          reject("No map stored");
-        }
-      });
-    });
-
-  if (onloadMap.value === "saved") {
+  // check if there is a map saved to indexedDB
+  if (byId("onloadBehavior").value === "lastSaved") {
     try {
-      await loadLastMap();
+      const blob = await ldb.get("lastMap");
+      if (blob) {
+        WARN && console.warn("Loading last stored map");
+        uploadMap(blob);
+        return;
+      }
     } catch (error) {
       ERROR && console.error(error);
-      WARN && console.warn("Cannot load stored map, random map to be generated");
-      await generateMapOnLoad();
     }
-  } else {
-    WARN && console.warn("Generate random map");
-    await generateMapOnLoad();
   }
+
+  // else generate random map
+  WARN && console.warn("Generate random map");
+  generateMapOnLoad();
 }
 
 async function generateMapOnLoad() {
   await applyStyleOnLoad(); // apply previously selected default or custom style
   await generate(); // generate map
-  focusOn(); // based on searchParams focus on point, cell or burg from MFCG
   applyPreset(); // apply saved layers preset
+  fitMapToScreen();
+  focusOn(); // based on searchParams focus on point, cell or burg from MFCG
 }
 
 // focus on coordinates, cell or burg provided in searchParams
@@ -404,65 +426,6 @@ function findBurgForMFCG(params) {
   tip("Here stands the glorious city of " + b.name, true, "success", 15000);
 }
 
-// apply default biomes data
-function applyDefaultBiomesSystem() {
-  const name = [
-    "Marine",
-    "Hot desert",
-    "Cold desert",
-    "Savanna",
-    "Grassland",
-    "Tropical seasonal forest",
-    "Temperate deciduous forest",
-    "Tropical rainforest",
-    "Temperate rainforest",
-    "Taiga",
-    "Tundra",
-    "Glacier",
-    "Wetland"
-  ];
-  const color = ["#466eab", "#fbe79f", "#b5b887", "#d2d082", "#c8d68f", "#b6d95d", "#29bc56", "#7dcb35", "#409c43", "#4b6b32", "#96784b", "#d5e7eb", "#0b9131"];
-  const habitability = [0, 4, 10, 22, 30, 50, 100, 80, 90, 12, 4, 0, 12];
-  const iconsDensity = [0, 3, 2, 120, 120, 120, 120, 150, 150, 100, 5, 0, 150];
-  const icons = [
-    {},
-    {dune: 3, cactus: 6, deadTree: 1},
-    {dune: 9, deadTree: 1},
-    {acacia: 1, grass: 9},
-    {grass: 1},
-    {acacia: 8, palm: 1},
-    {deciduous: 1},
-    {acacia: 5, palm: 3, deciduous: 1, swamp: 1},
-    {deciduous: 6, swamp: 1},
-    {conifer: 1},
-    {grass: 1},
-    {},
-    {swamp: 1}
-  ];
-  const cost = [10, 200, 150, 60, 50, 70, 70, 80, 90, 200, 1000, 5000, 150]; // biome movement cost
-  const biomesMartix = [
-    // hot ↔ cold [>19°C; <-4°C]; dry ↕ wet
-    new Uint8Array([1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10]),
-    new Uint8Array([3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 9, 9, 9, 9, 10, 10, 10]),
-    new Uint8Array([5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 10, 10, 10]),
-    new Uint8Array([5, 6, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 10, 10, 10]),
-    new Uint8Array([7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 10, 10])
-  ];
-
-  // parse icons weighted array into a simple array
-  for (let i = 0; i < icons.length; i++) {
-    const parsed = [];
-    for (const icon in icons[i]) {
-      for (let j = 0; j < icons[i][icon]; j++) {
-        parsed.push(icon);
-      }
-    }
-    icons[i] = parsed;
-  }
-
-  return {i: d3.range(0, name.length), name, color, biomesMartix, habitability, iconsDensity, icons, cost};
-}
-
 function handleZoom(isScaleChanged, isPositionChanged) {
   viewbox.attr("transform", `translate(${viewX} ${viewY}) scale(${scale})`);
 
@@ -470,7 +433,8 @@ function handleZoom(isScaleChanged, isPositionChanged) {
 
   if (isScaleChanged) {
     invokeActiveZooming();
-    drawScaleBar(scale);
+    drawScaleBar(scaleBar, scale);
+    fitScaleBar(scaleBar, svgWidth, svgHeight);
   }
 
   // zoom image converter overlay
@@ -509,6 +473,8 @@ function getViewBoxExtent() {
 
 // active zooming feature
 function invokeActiveZooming() {
+  const isOptimized = shapeRendering.value === "optimizeSpeed";
+
   if (coastline.select("#sea_island").size() && +coastline.select("#sea_island").attr("auto-filter")) {
     // toggle shade/blur filter for coatline on zoom
     const filter = scale > 1.5 && scale <= 2.6 ? null : scale > 2.6 ? "url(#blurFilter)" : "url(#dropShadow)";
@@ -536,7 +502,8 @@ function invokeActiveZooming() {
       const hidden = hideEmblems.checked && (size < 25 || size > 300);
       if (hidden) this.classList.add("hidden");
       else this.classList.remove("hidden");
-      if (!hidden && window.COArenderer && this.children.length && !this.children[0].getAttribute("href")) renderGroupCOAs(this);
+      if (!hidden && window.COArenderer && this.children.length && !this.children[0].getAttribute("href"))
+        renderGroupCOAs(this);
     });
   }
 
@@ -547,7 +514,7 @@ function invokeActiveZooming() {
     .attr("opacity", scale > 10 ? 0.2 : null);
 
   // change states halo width
-  if (!customization) {
+  if (!customization && !isOptimized) {
     const desired = +statesHalo.attr("data-width");
     const haloSize = rn(desired / scale ** 0.8, 2);
     statesHalo.attr("stroke-width", haloSize).style("display", haloSize > 0.1 ? "block" : "none");
@@ -575,7 +542,12 @@ function invokeActiveZooming() {
 }
 
 async function renderGroupCOAs(g) {
-  const [group, type] = g.id === "burgEmblems" ? [pack.burgs, "burg"] : g.id === "provinceEmblems" ? [pack.provinces, "province"] : [pack.states, "state"];
+  const [group, type] =
+    g.id === "burgEmblems"
+      ? [pack.burgs, "burg"]
+      : g.id === "provinceEmblems"
+      ? [pack.provinces, "province"]
+      : [pack.states, "state"];
   for (let use of g.children) {
     const i = +use.dataset.i;
     const id = type + "COA" + i;
@@ -604,9 +576,10 @@ void (function addDragToUpload() {
     overlay.style.display = "none";
     if (e.dataTransfer.items == null || e.dataTransfer.items.length !== 1) return; // no files or more than one
     const file = e.dataTransfer.items[0].getAsFile();
-    if (file.name.indexOf(".map") == -1) {
-      // not a .map file
-      alertMessage.innerHTML = "Please upload a <b>.map</b> file you have previously downloaded";
+
+    if (!file.name.endsWith(".map") && !file.name.endsWith(".gz")) {
+      alertMessage.innerHTML =
+        "Please upload a map file (<i>.map</i> or <i>.gz</i> formats) you have previously downloaded";
       $("#alert").dialog({
         resizable: false,
         title: "Invalid file format",
@@ -626,7 +599,7 @@ void (function addDragToUpload() {
     if (closeDialogs) closeDialogs();
     uploadMap(file, () => {
       overlay.style.display = "none";
-      overlay.innerHTML = "Drop a .map file to open";
+      overlay.innerHTML = "Drop a map file to open";
     });
   });
 })();
@@ -640,12 +613,13 @@ async function generate(options) {
     setSeed(precreatedSeed);
     INFO && console.group("Generated Map " + seed);
 
-    applyMapSize();
+    applyGraphSize();
     randomizeOptions();
 
-    if (shouldRegenerateGrid(grid)) grid = precreatedGraph || generateGrid();
+    if (shouldRegenerateGrid(grid, precreatedSeed)) grid = precreatedGraph || generateGrid();
     else delete grid.cells.h;
     grid.cells.h = await HeightmapGenerator.generate(grid);
+    pack = {}; // reset pack
 
     markFeatures();
     markupGridOcean();
@@ -664,7 +638,7 @@ async function generate(options) {
     Rivers.generate();
     drawRivers();
     Lakes.defineGroup();
-    defineBiomes();
+    Biomes.define();
 
     rankCells();
     Cultures.generate();
@@ -677,7 +651,7 @@ async function generate(options) {
 
     drawStates();
     drawBorders();
-    BurgsAndStates.drawStateLabels();
+    drawStateLabels();
 
     Rivers.specify();
     Lakes.generateName();
@@ -686,7 +660,7 @@ async function generate(options) {
     Markers.generate();
     addZones();
 
-    drawScaleBar(scale);
+    drawScaleBar(scaleBar, scale);
     Names.getMapName();
 
     WARN && console.warn(`TOTAL: ${rn((performance.now() - timeStart) / 1000, 2)}s`);
@@ -725,12 +699,10 @@ async function generate(options) {
 function setSeed(precreatedSeed) {
   if (!precreatedSeed) {
     const first = !mapHistory[0];
-    const url = new URL(window.location.href);
-    const params = url.searchParams;
-    const urlSeed = url.searchParams.get("seed");
+    const params = new URL(window.location.href).searchParams;
+    const urlSeed = params.get("seed");
     if (first && params.get("from") === "MFCG" && urlSeed.length === 13) seed = urlSeed.slice(0, -4);
     else if (first && urlSeed) seed = urlSeed;
-    else if (optionsSeed.value && optionsSeed.value != seed) seed = optionsSeed.value;
     else seed = generateSeed();
   } else {
     seed = precreatedSeed;
@@ -862,7 +834,7 @@ function addLakesInDeepDepressions() {
   TIME && console.timeEnd("addLakesInDeepDepressions");
 }
 
-// near sea lakes usually get a lot of water inflow, most of them should brake threshold and flow out to sea (see Ancylus Lake)
+// near sea lakes usually get a lot of water inflow, most of them should break threshold and flow out to sea (see Ancylus Lake)
 function openNearSeaLakes() {
   if (byId("templateInput").value === "Atoll") return; // no need for Atolls
 
@@ -873,29 +845,33 @@ function openNearSeaLakes() {
   const LIMIT = 22; // max height that can be breached by water
 
   for (const i of cells.i) {
-    const lake = cells.f[i];
-    if (features[lake].type !== "lake") continue; // not a lake cell
+    const lakeFeatureId = cells.f[i];
+    if (features[lakeFeatureId].type !== "lake") continue; // not a lake
 
     check_neighbours: for (const c of cells.c[i]) {
-      if (cells.t[c] !== 1 || cells.h[c] > LIMIT) continue; // water cannot brake this
+      if (cells.t[c] !== 1 || cells.h[c] > LIMIT) continue; // water cannot break this
 
       for (const n of cells.c[c]) {
         const ocean = cells.f[n];
         if (features[ocean].type !== "ocean") continue; // not an ocean
-        removeLake(c, lake, ocean);
+        removeLake(c, lakeFeatureId, ocean);
         break check_neighbours;
       }
     }
   }
 
-  function removeLake(threshold, lake, ocean) {
-    cells.h[threshold] = 19;
-    cells.t[threshold] = -1;
-    cells.f[threshold] = ocean;
-    cells.c[threshold].forEach(function (c) {
+  function removeLake(thresholdCellId, lakeFeatureId, oceanFeatureId) {
+    cells.h[thresholdCellId] = 19;
+    cells.t[thresholdCellId] = -1;
+    cells.f[thresholdCellId] = oceanFeatureId;
+    cells.c[thresholdCellId].forEach(function (c) {
       if (cells.h[c] >= 20) cells.t[c] = 1; // mark as coastline
     });
-    features[lake].type = "ocean"; // mark former lake as ocean
+
+    cells.i.forEach(i => {
+      if (cells.f[i] === lakeFeatureId) cells.f[i] = oceanFeatureId;
+    });
+    features[lakeFeatureId].type = "ocean"; // mark former lake as ocean
   }
 
   TIME && console.timeEnd("openLakes");
@@ -937,7 +913,7 @@ function defineMapSize() {
 
     const part = grid.features.some(f => f.land && f.border); // if land goes over map borders
     const max = part ? 80 : 100; // max size
-    const lat = () => gauss(P(0.5) ? 40 : 60, 15, 25, 75); // latitude shift
+    const lat = () => gauss(P(0.5) ? 40 : 60, 20, 25, 75); // latitude shift
 
     if (!part) {
       if (template === "Pangea") return [100, 50];
@@ -972,30 +948,49 @@ function calculateMapCoordinates() {
   mapCoordinates = {latT, latN, latS, lonT: lon * 2, lonW: -lon, lonE: lon};
 }
 
-// temperature model
+// temperature model, trying to follow real-world data
+// based on http://www-das.uwyo.edu/~geerts/cwx/notes/chap16/Image64.gif
 function calculateTemperatures() {
   TIME && console.time("calculateTemperatures");
   const cells = grid.cells;
   cells.temp = new Int8Array(cells.i.length); // temperature array
 
-  const tEq = +temperatureEquatorInput.value;
-  const tPole = +temperaturePoleInput.value;
-  const tDelta = tEq - tPole;
-  const int = d3.easePolyInOut.exponent(0.5); // interpolation function
+  const {temperatureEquator, temperatureNorthPole, temperatureSouthPole} = options;
+  const tropics = [16, -20]; // tropics zone
+  const tropicalGradient = 0.15;
 
-  d3.range(0, cells.i.length, grid.cellsX).forEach(function (r) {
-    const y = grid.points[r][1];
-    const lat = Math.abs(mapCoordinates.latN - (y / graphHeight) * mapCoordinates.latT); // [0; 90]
-    const initTemp = tEq - int(lat / 90) * tDelta;
-    for (let i = r; i < r + grid.cellsX; i++) {
-      cells.temp[i] = minmax(initTemp - convertToFriendly(cells.h[i]), -128, 127);
+  const tempNorthTropic = temperatureEquator - tropics[0] * tropicalGradient;
+  const northernGradient = (tempNorthTropic - temperatureNorthPole) / (90 - tropics[0]);
+
+  const tempSouthTropic = temperatureEquator + tropics[1] * tropicalGradient;
+  const southernGradient = (tempSouthTropic - temperatureSouthPole) / (90 + tropics[1]);
+
+  const exponent = +heightExponentInput.value;
+
+  for (let rowCellId = 0; rowCellId < cells.i.length; rowCellId += grid.cellsX) {
+    const [, y] = grid.points[rowCellId];
+    const rowLatitude = mapCoordinates.latN - (y / graphHeight) * mapCoordinates.latT; // [90; -90]
+    const tempSeaLevel = calculateSeaLevelTemp(rowLatitude);
+    DEBUG && console.info(`${rn(rowLatitude)}° sea temperature: ${rn(tempSeaLevel)}°C`);
+
+    for (let cellId = rowCellId; cellId < rowCellId + grid.cellsX; cellId++) {
+      const tempAltitudeDrop = getAltitudeTemperatureDrop(cells.h[cellId]);
+      cells.temp[cellId] = minmax(tempSeaLevel - tempAltitudeDrop, -128, 127);
     }
-  });
+  }
 
-  // temperature decreases by 6.5 degree C per 1km
-  function convertToFriendly(h) {
+  function calculateSeaLevelTemp(latitude) {
+    const isTropical = latitude <= 16 && latitude >= -20;
+    if (isTropical) return temperatureEquator - Math.abs(latitude) * tropicalGradient;
+
+    return latitude > 0
+      ? tempNorthTropic - (latitude - tropics[0]) * northernGradient
+      : tempSouthTropic + (latitude - tropics[1]) * southernGradient;
+  }
+
+  // temperature drops by 6.5°C per 1km of altitude
+  function getAltitudeTemperatureDrop(h) {
     if (h < 20) return 0;
-    const exponent = +heightExponentInput.value;
     const height = Math.pow(h - 18, exponent);
     return rn((height / 1000) * 6.5);
   }
@@ -1263,6 +1258,7 @@ function drawCoastline() {
     features[f].vertices = vchain;
 
     const path = round(lineGen(points));
+
     if (features[f].type === "lake") {
       landMask
         .append("path")
@@ -1360,21 +1356,13 @@ function drawCoastline() {
 // Re-mark features (ocean, lakes, islands)
 function reMarkFeatures() {
   TIME && console.time("reMarkFeatures");
-  const cells = pack.cells,
-    features = (pack.features = [0]);
+  const cells = pack.cells;
+  const features = (pack.features = [0]);
+
   cells.f = new Uint16Array(cells.i.length); // cell feature number
   cells.t = new Int8Array(cells.i.length); // cell type: 1 = land along coast; -1 = water along coast;
   cells.haven = cells.i.length < 65535 ? new Uint16Array(cells.i.length) : new Uint32Array(cells.i.length); // cell haven (opposite water cell);
   cells.harbor = new Uint8Array(cells.i.length); // cell harbor (number of adjacent water cells);
-
-  const defineHaven = i => {
-    const water = cells.c[i].filter(c => cells.h[c] < 20);
-    const dist2 = water.map(c => (cells.p[i][0] - cells.p[c][0]) ** 2 + (cells.p[i][1] - cells.p[c][1]) ** 2);
-    const closest = water[dist2.indexOf(Math.min.apply(Math, dist2))];
-
-    cells.haven[i] = closest;
-    cells.harbor[i] = water.length;
-  };
 
   if (!cells.i.length) return; // no cells -> there is nothing to do
   for (let i = 1, queue = [0]; queue[0] !== -1; i++) {
@@ -1416,6 +1404,15 @@ function reMarkFeatures() {
   // markupPackLand
   markup(pack.cells, 3, 1, 0);
 
+  function defineHaven(i) {
+    const water = cells.c[i].filter(c => cells.h[c] < 20);
+    const dist2 = water.map(c => (cells.p[i][0] - cells.p[c][0]) ** 2 + (cells.p[i][1] - cells.p[c][1]) ** 2);
+    const closest = water[dist2.indexOf(Math.min.apply(Math, dist2))];
+
+    cells.haven[i] = closest;
+    cells.harbor[i] = water.length;
+  }
+
   function defineOceanGroup(number) {
     if (number > grid.cells.i.length / 25) return "ocean";
     if (number > grid.cells.i.length / 100) return "sea";
@@ -1436,45 +1433,6 @@ function isWetLand(moisture, temperature, height) {
   if (moisture > 40 && temperature > -2 && height < 25) return true; //near coast
   if (moisture > 24 && temperature > -2 && height > 24 && height < 60) return true; //off coast
   return false;
-}
-
-// assign biome id for each cell
-function defineBiomes() {
-  TIME && console.time("defineBiomes");
-  const {cells} = pack;
-  const {temp, prec} = grid.cells;
-  cells.biome = new Uint8Array(cells.i.length); // biomes array
-
-  for (const i of cells.i) {
-    const temperature = temp[cells.g[i]];
-    const height = cells.h[i];
-    const moisture = height < 20 ? 0 : calculateMoisture(i);
-    cells.biome[i] = getBiomeId(moisture, temperature, height);
-  }
-
-  function calculateMoisture(i) {
-    let moist = prec[cells.g[i]];
-    if (cells.r[i]) moist += Math.max(cells.fl[i] / 20, 2);
-
-    const n = cells.c[i]
-      .filter(isLand)
-      .map(c => prec[cells.g[c]])
-      .concat([moist]);
-    return rn(4 + d3.mean(n));
-  }
-
-  TIME && console.timeEnd("defineBiomes");
-}
-
-// assign biome id to a cell
-function getBiomeId(moisture, temperature, height) {
-  if (height < 20) return 0; // marine biome: all water cells
-  if (temperature < -5) return 11; // permafrost biome
-  if (isWetLand(moisture, temperature, height)) return 12; // wetland biome
-
-  const moistureBand = Math.min((moisture / 5) | 0, 4); // [0-4]
-  const temperatureBand = Math.min(Math.max(20 - temperature, 0), 25); // [0-25]
-  return biomesData.biomesMartix[moistureBand][temperatureBand];
 }
 
 // assess cells suitability to calculate population and rand cells for culture center and burgs placement
@@ -1562,7 +1520,9 @@ function addZones(number = 1) {
     const invader = ra(atWar);
     const target = invader.diplomacy.findIndex(d => d === "Enemy");
 
-    const cell = ra(cells.i.filter(i => cells.state[i] === target && cells.c[i].some(c => cells.state[c] === invader.i)));
+    const cell = ra(
+      cells.i.filter(i => cells.state[i] === target && cells.c[i].some(c => cells.state[c] === invader.i))
+    );
     if (!cell) return;
 
     const cellsArray = [],
@@ -1604,7 +1564,9 @@ function addZones(number = 1) {
 
     const neib = ra(state.neighbors.filter(n => n && !states[n].removed));
     if (!neib) return;
-    const cell = cells.i.find(i => cells.state[i] === state.i && !state.removed && cells.c[i].some(c => cells.state[c] === neib));
+    const cell = cells.i.find(
+      i => cells.state[i] === state.i && !state.removed && cells.c[i].some(c => cells.state[c] === neib)
+    );
     const cellsArray = [];
     const queue = [];
     if (cell) queue.push(cell);
@@ -1625,7 +1587,17 @@ function addZones(number = 1) {
       });
     }
 
-    const rebels = rw({Rebels: 5, Insurgents: 2, Mutineers: 1, Rioters: 1, Separatists: 1, Secessionists: 1, Insurrection: 2, Rebellion: 1, Conspiracy: 2});
+    const rebels = rw({
+      Rebels: 5,
+      Insurgents: 2,
+      Mutineers: 1,
+      Rioters: 1,
+      Separatists: 1,
+      Secessionists: 1,
+      Insurrection: 2,
+      Rebellion: 1,
+      Conspiracy: 2
+    });
     const name = getAdjective(states[neib].name) + " " + rebels;
     zonesData.push({name, type: "Rebels", cells: cellsArray, fill: "url(#hatch3)"});
   }
@@ -1634,7 +1606,14 @@ function addZones(number = 1) {
     const organized = ra(pack.religions.filter(r => r.type === "Organized"));
     if (!organized) return;
 
-    const cell = ra(cells.i.filter(i => cells.religion[i] && cells.religion[i] !== organized.i && cells.c[i].some(c => cells.religion[c] === organized.i)));
+    const cell = ra(
+      cells.i.filter(
+        i =>
+          cells.religion[i] &&
+          cells.religion[i] !== organized.i &&
+          cells.c[i].some(c => cells.religion[c] === organized.i)
+      )
+    );
     if (!cell) return;
     const target = cells.religion[cell];
     const cellsArray = [],
@@ -1700,11 +1679,54 @@ function addZones(number = 1) {
       });
     }
 
-    const adjective = () => ra(["Great", "Silent", "Severe", "Blind", "Unknown", "Loud", "Deadly", "Burning", "Bloody", "Brutal", "Fatal"]);
-    const animal = () => ra(["Ape", "Bear", "Boar", "Cat", "Cow", "Dog", "Pig", "Fox", "Bird", "Horse", "Rat", "Raven", "Sheep", "Spider", "Wolf"]);
-    const color = () => ra(["Golden", "White", "Black", "Red", "Pink", "Purple", "Blue", "Green", "Yellow", "Amber", "Orange", "Brown", "Grey"]);
+    const adjective = () =>
+      ra(["Great", "Silent", "Severe", "Blind", "Unknown", "Loud", "Deadly", "Burning", "Bloody", "Brutal", "Fatal"]);
+    const animal = () =>
+      ra([
+        "Ape",
+        "Bear",
+        "Boar",
+        "Cat",
+        "Cow",
+        "Dog",
+        "Pig",
+        "Fox",
+        "Bird",
+        "Horse",
+        "Rat",
+        "Raven",
+        "Sheep",
+        "Spider",
+        "Wolf"
+      ]);
+    const color = () =>
+      ra([
+        "Golden",
+        "White",
+        "Black",
+        "Red",
+        "Pink",
+        "Purple",
+        "Blue",
+        "Green",
+        "Yellow",
+        "Amber",
+        "Orange",
+        "Brown",
+        "Grey"
+      ]);
 
-    const type = rw({Fever: 5, Pestilence: 2, Flu: 2, Pox: 2, Smallpox: 2, Plague: 4, Cholera: 2, Dropsy: 1, Leprosy: 2});
+    const type = rw({
+      Fever: 5,
+      Pestilence: 2,
+      Flu: 2,
+      Pox: 2,
+      Smallpox: 2,
+      Plague: 4,
+      Cholera: 2,
+      Dropsy: 1,
+      Leprosy: 2
+    });
     const name = rw({[color()]: 4, [animal()]: 2, [adjective()]: 1}) + " " + type;
     zonesData.push({name, type: "Disease", cells: cellsArray, fill: "url(#hatch12)"});
   }
@@ -1827,7 +1849,9 @@ function addZones(number = 1) {
       meanFlux = d3.mean(fl),
       maxFlux = d3.max(fl),
       flux = (maxFlux - meanFlux) / 2 + meanFlux;
-    const rivers = cells.i.filter(i => !used[i] && cells.h[i] < 50 && cells.r[i] && cells.fl[i] > flux && cells.burg[i]);
+    const rivers = cells.i.filter(
+      i => !used[i] && cells.h[i] < 50 && cells.r[i] && cells.fl[i] > flux && cells.burg[i]
+    );
     if (!rivers.length) return;
 
     const cell = +ra(rivers),
@@ -1926,7 +1950,7 @@ function showStatistics() {
 
   mapId = Date.now(); // unique map id is it's creation date number
   mapHistory.push({seed, width: graphWidth, height: graphHeight, template: heightmap, created: mapId});
-  INFO && console.log(stats);
+  INFO && console.info(stats);
 }
 
 const regenerateMap = debounce(async function (options) {
@@ -1945,13 +1969,16 @@ const regenerateMap = debounce(async function (options) {
   if (ThreeD.options.isOn) ThreeD.redraw();
   if ($("#worldConfigurator").is(":visible")) editWorld();
 
+  fitMapToScreen();
   shouldShowLoading && hideLoading();
   clearMainTip();
 }, 250);
 
 // clear the map
 function undraw() {
-  viewbox.selectAll("path, circle, polygon, line, text, use, #zones > g, #armies > g, #ruler > g").remove();
+  viewbox
+    .selectAll("path, circle, polygon, line, text, use, #texture > image, #zones > g, #armies > g, #ruler > g")
+    .remove();
   document
     .getElementById("deftemp")
     .querySelectorAll("path, clipPath, svg")

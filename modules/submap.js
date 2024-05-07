@@ -28,7 +28,7 @@ window.Submap = (function () {
 
     const projection = options.projection;
     const inverse = options.inverse;
-    const stage = s => INFO && console.log("SUBMAP:", s);
+    const stage = s => INFO && console.info("SUBMAP:", s);
     const timeStart = performance.now();
     invokeActiveZooming();
 
@@ -36,13 +36,14 @@ window.Submap = (function () {
     seed = parentMap.seed;
     Math.random = aleaPRNG(seed);
     INFO && console.group("SubMap with seed: " + seed);
-    DEBUG && console.log("Using Options:", options);
+    DEBUG && console.info("Using Options:", options);
 
     // create new grid
-    applyMapSize();
+    applyGraphSize();
     grid = generateGrid();
 
-    drawScaleBar(scale);
+    drawScaleBar(scaleBar, scale);
+    fitScaleBar(scaleBar, svgWidth, svgHeight);
 
     const resampler = (points, qtree, f) => {
       for (const [i, [x, y]] of points.entries()) {
@@ -215,7 +216,7 @@ window.Submap = (function () {
     // biome calculation based on (resampled) grid.cells.temp and prec
     // it's safe to recalculate.
     stage("Regenerating Biome.");
-    defineBiomes();
+    Biomes.define();
     // recalculate suitability and population
     // TODO: normalize according to the base-map
     rankCells();
@@ -276,7 +277,7 @@ window.Submap = (function () {
 
     drawStates();
     drawBorders();
-    BurgsAndStates.drawStateLabels();
+    drawStateLabels();
 
     Rivers.specify();
     Lakes.generateName();
@@ -395,7 +396,7 @@ window.Submap = (function () {
           b.removed = true;
           return;
         }
-        DEBUG && console.log(`Moving ${b.name} from ${cityCell} to ${newCell} near ${neighbor}.`);
+        DEBUG && console.info(`Moving ${b.name} from ${cityCell} to ${newCell} near ${neighbor}.`);
         [b.x, b.y] = b.port ? getMiddlePoint(newCell, neighbor) : cells.p[newCell];
         if (b.port) b.port = cells.f[neighbor]; // copy feature number
         b.cell = newCell;
@@ -403,7 +404,7 @@ window.Submap = (function () {
       } else {
         b.cell = cityCell;
       }
-      if (!b.lock) b.lock = options.lockBurgs;
+      if (b.i && !b.lock) b.lock = options.lockBurgs;
       cells.burg[b.cell] = id;
     });
   }

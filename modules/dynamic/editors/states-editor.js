@@ -114,6 +114,7 @@ function insertEditorHtml() {
       </div>
 
       <button id="statesAdd" data-tip="Add a new state. Hold Shift to add multiple" class="icon-plus"></button>
+      <button id="statesMerge" data-tip="Merge several states into one" class="icon-layer-group"></button>
       <button id="statesExport" data-tip="Save state-related data as a text file (.csv)" class="icon-download"></button>
     </div>
   </div>`;
@@ -140,6 +141,7 @@ function addListeners() {
   byId("statesManuallyApply").on("click", applyStatesManualAssignent);
   byId("statesManuallyCancel").on("click", () => exitStatesManualAssignment(false));
   byId("statesAdd").on("click", enterAddStateMode);
+  byId("statesMerge").on("click", openStateMergeDialog);
   byId("statesExport").on("click", downloadStatesCsv);
 
   $body.on("click", event => {
@@ -150,9 +152,12 @@ function addListeners() {
     else if (classList.contains("name")) editStateName(stateId);
     else if (classList.contains("coaIcon")) editEmblem("state", "stateCOA" + stateId, pack.states[stateId]);
     else if (classList.contains("icon-star-empty")) stateCapitalZoomIn(stateId);
+    else if (classList.contains("icon-dot-circled")) overviewBurgs({stateId});
     else if (classList.contains("statePopulation")) changePopulation(stateId);
     else if (classList.contains("icon-pin")) toggleFog(stateId, classList);
     else if (classList.contains("icon-trash-empty")) stateRemovePrompt(stateId);
+    else if (classList.contains("icon-lock") || classList.contains("icon-lock-open"))
+      updateLockStatus(stateId, classList);
   });
 
   $body.on("input", function (ev) {
@@ -161,8 +166,6 @@ function addListeners() {
     const line = $element.parentNode;
     const state = +line.dataset.id;
     if (classList.contains("stateCapital")) stateChangeCapitalName(state, line, $element.value);
-    else if (classList.contains("cultureType")) stateChangeType(state, line, $element.value);
-    else if (classList.contains("statePower")) stateChangeExpansionism(state, line, $element.value);
   });
 
   $body.on("change", function (ev) {
@@ -171,6 +174,8 @@ function addListeners() {
     const line = $element.parentNode;
     const state = +line.dataset.id;
     if (classList.contains("stateCulture")) stateChangeCulture(state, line, $element.value);
+    else if (classList.contains("cultureType")) stateChangeType(state, line, $element.value);
+    else if (classList.contains("statePower")) stateChangeExpansionism(state, line, $element.value);
   });
 }
 
@@ -228,7 +233,7 @@ function statesEditorAddLines() {
         <span class="icon-star-empty placeholder hide"></span>
         <input class="stateCapital placeholder hide" />
         <select class="stateCulture placeholder hide">${getCultureOptions(0)}</select>
-        <span data-tip="Burgs count" class="icon-dot-circled hide" style="padding-right: 1px"></span>
+        <span data-tip="Click to overview neutral burgs" class="icon-dot-circled pointer hide" style="padding-right: 1px"></span>
         <div data-tip="Burgs count" class="stateBurgs hide">${s.burgs}</div>
         <span data-tip="Neutral lands area" style="padding-right: 4px" class="icon-map-o hide"></span>
         <div data-tip="Neutral lands area" class="stateArea hide" style="width: 6em">${si(area)} ${unit}</div>
@@ -273,7 +278,7 @@ function statesEditorAddLines() {
       <select data-tip="Dominant culture. Click to change" class="stateCulture hide">${getCultureOptions(
         s.culture
       )}</select>
-      <span data-tip="Burgs count" style="padding-right: 1px" class="icon-dot-circled hide"></span>
+      <span data-tip="Click to overview state burgs" style="padding-right: 1px" class="icon-dot-circled pointer hide"></span>
       <div data-tip="Burgs count" class="stateBurgs hide">${s.burgs}</div>
       <span data-tip="State area" style="padding-right: 4px" class="icon-map-o hide"></span>
       <div data-tip="State area" class="stateArea hide" style="width: 6em">${si(area)} ${unit}</div>
@@ -288,6 +293,9 @@ function statesEditorAddLines() {
       <span data-tip="Cells count" class="icon-check-empty ${hidden} show hide"></span>
       <div data-tip="Cells count" class="stateCells ${hidden} show hide">${s.cells}</div>
       <span data-tip="Toggle state focus" class="icon-pin ${focused ? "" : " inactive"} hide"></span>
+      <span data-tip="Lock the state to protect it from re-generation" class="icon-lock${
+        s.lock ? "" : "-open"
+      } hide"></span>
       <span data-tip="Remove the state" class="icon-trash-empty hide"></span>
     </div>`;
   }
@@ -426,13 +434,13 @@ function editStateName(state) {
   modules.editStateName = true;
 
   // add listeners
-  byId("stateNameEditorShortCulture").on("click", regenerateShortNameCuture);
+  byId("stateNameEditorShortCulture").on("click", regenerateShortNameCulture);
   byId("stateNameEditorShortRandom").on("click", regenerateShortNameRandom);
   byId("stateNameEditorAddForm").on("click", addCustomForm);
   byId("stateNameEditorCustomForm").on("change", addCustomForm);
   byId("stateNameEditorFullRegenerate").on("click", regenerateFullName);
 
-  function regenerateShortNameCuture() {
+  function regenerateShortNameCulture() {
     const state = +stateNameEditor.dataset.state;
     const culture = pack.states[state].culture;
     const name = Names.getState(Names.getCultureShort(culture), culture);
@@ -487,7 +495,7 @@ function editStateName(state) {
     s.name = nameInput.value;
     s.formName = formSelect.value;
     s.fullName = fullNameInput.value;
-    if (changed && stateNameEditorUpdateLabel.checked) BurgsAndStates.drawStateLabels([s.i]);
+    if (changed && stateNameEditorUpdateLabel.checked) drawStateLabels([s.i]);
     refreshStatesEditor();
   }
 }
@@ -616,28 +624,36 @@ function stateRemovePrompt(state) {
   });
 }
 
-function stateRemove(state) {
-  statesBody.select("#state" + state).remove();
-  statesBody.select("#state-gap" + state).remove();
-  statesHalo.select("#state-border" + state).remove();
-  labels.select("#stateLabel" + state).remove();
-  defs.select("#textPath_stateLabel" + state).remove();
+function stateRemove(stateId) {
+  statesBody.select("#state" + stateId).remove();
+  statesBody.select("#state-gap" + stateId).remove();
+  statesHalo.select("#state-border" + stateId).remove();
+  labels.select("#stateLabel" + stateId).remove();
+  defs.select("#textPath_stateLabel" + stateId).remove();
 
-  unfog("focusState" + state);
-  pack.burgs.forEach(b => {
-    if (b.state === state) b.state = 0;
+  unfog("focusState" + stateId);
+
+  pack.burgs.forEach(burg => {
+    if (burg.state === stateId) {
+      burg.state = 0;
+      if (burg.capital) {
+        burg.capital = 0;
+        moveBurgToGroup(burg.i, "towns");
+      }
+    }
   });
+
   pack.cells.state.forEach((s, i) => {
-    if (s === state) pack.cells.state[i] = 0;
+    if (s === stateId) pack.cells.state[i] = 0;
   });
 
   // remove emblem
-  const coaId = "stateCOA" + state;
+  const coaId = "stateCOA" + stateId;
   byId(coaId).remove();
-  emblems.select(`#stateEmblems > use[data-i='${state}']`).remove();
+  emblems.select(`#stateEmblems > use[data-i='${stateId}']`).remove();
 
   // remove provinces
-  pack.states[state].provinces.forEach(p => {
+  pack.states[stateId].provinces.forEach(p => {
     pack.provinces[p] = {i: p, removed: true};
     pack.cells.province.forEach((pr, i) => {
       if (pr === p) pack.cells.province[i] = 0;
@@ -652,19 +668,14 @@ function stateRemove(state) {
   });
 
   // remove military
-  pack.states[state].military.forEach(m => {
-    const id = `regiment${state}-${m.i}`;
+  pack.states[stateId].military.forEach(m => {
+    const id = `regiment${stateId}-${m.i}`;
     const index = notes.findIndex(n => n.id === id);
     if (index != -1) notes.splice(index, 1);
   });
-  armies.select("g#army" + state).remove();
+  armies.select("g#army" + stateId).remove();
 
-  const capital = pack.states[state].capital;
-  pack.burgs[capital].capital = 0;
-  pack.burgs[capital].state = 0;
-  moveBurgToGroup(capital, "towns");
-
-  pack.states[state] = {i: state, removed: true};
+  pack.states[stateId] = {i: stateId, removed: true};
 
   debug.selectAll(".highlight").remove();
   if (!layerIsOn("toggleStates")) toggleStates();
@@ -870,7 +881,7 @@ function recalculateStates(must) {
   if (!layerIsOn("toggleBorders")) toggleBorders();
   else drawBorders();
   if (layerIsOn("toggleProvinces")) drawProvinces();
-  if (adjustLabels.checked) BurgsAndStates.drawStateLabels();
+  if (adjustLabels.checked) drawStateLabels();
   refreshStatesEditor();
 }
 
@@ -878,7 +889,6 @@ function changeStatesGrowthRate() {
   const growthRate = +this.value;
   byId("statesNeutral").value = growthRate;
   byId("statesNeutralNumber").value = growthRate;
-  statesNeutral = growthRate;
   tip("Growth rate: " + growthRate);
   recalculateStates(false);
 }
@@ -1016,7 +1026,7 @@ function applyStatesManualAssignent() {
   if (affectedStates.length) {
     refreshStatesEditor();
     layerIsOn("toggleStates") ? drawStates() : toggleStates();
-    if (adjustLabels.checked) BurgsAndStates.drawStateLabels([...new Set(affectedStates)]);
+    if (adjustLabels.checked) drawStateLabels([...new Set(affectedStates)]);
     adjustProvinces([...new Set(affectedProvinces)]);
     layerIsOn("toggleBorders") ? drawBorders() : toggleBorders();
     if (layerIsOn("toggleProvinces")) drawProvinces();
@@ -1323,6 +1333,141 @@ function exitAddStateMode() {
   if (statesAdd.classList.contains("pressed")) statesAdd.classList.remove("pressed");
 }
 
+function openStateMergeDialog() {
+  const emblem = i => /* html */ `<svg class="coaIcon" viewBox="0 0 200 200"><use href="#stateCOA${i}"></use></svg>`;
+  const validStates = pack.states.filter(s => s.i && !s.removed);
+
+  const statesSelector = validStates
+    .map(
+      s => /* html */ `
+      <div data-tip="${s.fullName}">
+        <input type="radio" name="rulingState" value="${s.i}" />
+        <input id="selectState${s.i}" class="checkbox" type="checkbox" name="statesToMerge" value="${s.i}"} />
+        <label for="selectState${s.i}" class="checkbox-label">${emblem(s.i)}${s.fullName}</label>
+      </div>
+    `
+    )
+    .join("");
+
+  alertMessage.innerHTML = /* html */ `
+    <form id='mergeStatesForm' style="overflow: hidden; display: flex; flex-direction: column; gap: 1em;">
+      <header style='font-weight:bold;'>Select multiple states to merge and the ruling state to merge into</header>
+      <main style='display: grid; grid-template-columns: 1fr 1fr; gap: .3em;'>
+        ${statesSelector}
+      </main>
+    </form>
+  `;
+
+  $("#alert").dialog({
+    width: fitContent(),
+    title: `Merge states`,
+    buttons: {
+      Merge: function () {
+        const formData = new FormData(byId("mergeStatesForm"));
+
+        const rulingStateId = Number(formData.get("rulingState"));
+        if (!rulingStateId) return tip("Please select a state to merge into", false, "error");
+        const rullingState = pack.states[rulingStateId];
+
+        const statesToMerge = formData
+          .getAll("statesToMerge")
+          .map(Number)
+          .filter(stateId => stateId !== rulingStateId);
+        if (!statesToMerge.length) return tip("Please select several states to merge", false, "error");
+
+        confirmationDialog({
+          title: "Merge states",
+          // prettier-ignore
+          message: /* html */ `
+            <p>The following states will be <strong>removed</strong>: ${statesToMerge.map(stateId => `${emblem(stateId)}${pack.states[stateId].name}`).join(", ")}.</p>
+            <p>Removed states data (burgs, provinces, regiments) will be assigned to ${emblem(rullingState.i)}${rullingState.name}.</p>
+            <p>Are you sure you want to merge states? This action cannot be reverted.</p>`,
+          confirm: "Merge",
+          onConfirm: () => {
+            mergeStates(statesToMerge, rulingStateId);
+            $(this).dialog("close");
+          }
+        });
+      },
+      Cancel: function () {
+        $(this).dialog("close");
+      }
+    }
+  });
+
+  function mergeStates(statesToMerge, rulingStateId) {
+    const rulingState = pack.states[rulingStateId];
+    const rulingStateArmy = byId("army" + rulingStateId);
+
+    // remove states to be merged
+    statesToMerge.forEach(stateId => {
+      const state = pack.states[stateId];
+      state.removed = true;
+
+      statesBody.select("#state" + stateId).remove();
+      statesBody.select("#state-gap" + stateId).remove();
+      statesHalo.select("#state-border" + stateId).remove();
+      labels.select("#stateLabel" + stateId).remove();
+      defs.select("#textPath_stateLabel" + stateId).remove();
+
+      byId("stateCOA" + stateId).remove();
+      emblems.select(`#stateEmblems > use[data-i='${stateId}']`).remove();
+
+      // add merged state regiments to the ruling state
+      state.military.forEach(regiment => {
+        const oldId = `regiment${stateId}-${regiment.i}`;
+        const newIndex = rulingState.military.length;
+        rulingState.military.push({...regiment, i: newIndex});
+        const newId = `regiment${rulingStateId}-${newIndex}`;
+
+        const note = notes.find(n => n.id === oldId);
+        if (note) note.id = newId;
+
+        const element = byId(oldId);
+        if (element) {
+          element.id = newId;
+          element.dataset.state = rulingStateId;
+          element.dataset.id = newIndex;
+          rulingStateArmy.appendChild(element);
+        }
+      });
+
+      armies.select("g#army" + stateId).remove();
+    });
+
+    // reassing burgs
+    pack.burgs.forEach(b => {
+      if (statesToMerge.includes(b.state)) {
+        if (b.capital) {
+          moveBurgToGroup(b.i, "towns");
+          b.capital = 0;
+        }
+        b.state = rulingStateId;
+      }
+    });
+
+    // reassign provinces
+    pack.provinces.forEach((p, i) => {
+      if (statesToMerge.includes(p.state)) p.state = rulingStateId;
+    });
+
+    // reassing cells
+    pack.cells.state.forEach((s, i) => {
+      if (statesToMerge.includes(s)) pack.cells.state[i] = rulingStateId;
+    });
+
+    unfog();
+    debug.selectAll(".highlight").remove();
+
+    layerIsOn("toggleStates") ? drawStates() : toggleStates();
+    layerIsOn("toggleBorders") ? drawBorders() : toggleBorders();
+    layerIsOn("toggleProvinces") && drawProvinces();
+    drawStateLabels([rulingStateId]);
+
+    refreshStatesEditor();
+  }
+}
+
 function downloadStatesCsv() {
   const unit = getAreaUnit("2");
   const headers = `Id,State,Full Name,Form,Color,Capital,Culture,Type,Expansionism,Cells,Burgs,Area ${unit},Total Population,Rural Population,Urban Population`;
@@ -1361,4 +1506,12 @@ function closeStatesEditor() {
   if (customization === 3) exitAddStateMode();
   debug.selectAll(".highlight").remove();
   $body.innerHTML = "";
+}
+
+function updateLockStatus(stateId, classList) {
+  const s = pack.states[stateId];
+  s.lock = !s.lock;
+
+  classList.toggle("icon-lock-open");
+  classList.toggle("icon-lock");
 }

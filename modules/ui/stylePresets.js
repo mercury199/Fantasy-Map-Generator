@@ -1,14 +1,28 @@
 // UI module to control the style presets
 "use strict";
 
-const systemPresets = ["default", "ancient", "gloom", "light", "watercolor", "clean", "atlas", "cyberpunk", "monochrome"];
+const systemPresets = [
+  "default",
+  "ancient",
+  "gloom",
+  "pale",
+  "light",
+  "watercolor",
+  "clean",
+  "atlas",
+  "cyberpunk",
+  "night",
+  "monochrome"
+];
 const customPresetPrefix = "fmgStyle_";
 
 // add style presets to list
 {
   const systemOptions = systemPresets.map(styleName => `<option value="${styleName}">${styleName}</option>`);
   const storedStyles = Object.keys(localStorage).filter(key => key.startsWith(customPresetPrefix));
-  const customOptions = storedStyles.map(styleName => `<option value="${styleName}">${styleName.replace(customPresetPrefix, "")} [custom]</option>`);
+  const customOptions = storedStyles.map(
+    styleName => `<option value="${styleName}">${styleName.replace(customPresetPrefix, "")} [custom]</option>`
+  );
   const options = systemOptions.join("") + customOptions.join("");
   document.getElementById("stylePreset").innerHTML = options;
 }
@@ -37,7 +51,8 @@ async function getStylePreset(desiredPreset) {
       const isValid = JSON.isValid(storedStyleJSON);
       if (isValid) return [desiredPreset, JSON.parse(storedStyleJSON)];
 
-      ERROR && console.error(`Custom style ${desiredPreset} stored in localStorage is not valid. Applying default style`);
+      ERROR &&
+        console.error(`Custom style ${desiredPreset} stored in localStorage is not valid. Applying default style`);
       presetToLoad = "default";
     }
   }
@@ -47,21 +62,19 @@ async function getStylePreset(desiredPreset) {
 }
 
 async function fetchSystemPreset(preset) {
-  const style = await fetch(`./styles/${preset}.json`)
-    .then(res => res.json())
-    .catch(err => {
-      ERROR && console.error("Error on loading style preset", preset, err);
-      return null;
-    });
-
-  if (!style) throw new Error("Cannot fetch style preset", preset);
-  return style;
+  try {
+    const res = await fetch(`./styles/${preset}.json`);
+    return await res.json();
+  } catch (err) {
+    throw new Error("Cannot fetch style preset", preset);
+  }
 }
 
 function applyStyle(style) {
   for (const selector in style) {
     const el = document.querySelector(selector);
     if (!el) continue;
+
     for (const attribute in style[selector]) {
       const value = style[selector][attribute];
 
@@ -75,16 +88,27 @@ function applyStyle(style) {
       } else {
         el.setAttribute(attribute, value);
       }
+
+      if (selector === "#texture") {
+        const image = document.querySelector("#texture > image");
+        if (image) {
+          if (attribute === "data-x") image.setAttribute("x", value);
+          if (attribute === "data-y") image.setAttribute("y", value);
+          if (attribute === "data-href") image.setAttribute("href", value);
+        }
+      }
+
+      // add custom heightmap color scheme
+      if (selector === "#terrs" && attribute === "scheme" && !(value in heightmapColorSchemes)) {
+        addCustomColorScheme(value);
+      }
     }
   }
 }
 
 function requestStylePresetChange(preset) {
   const isConfirmed = sessionStorage.getItem("styleChangeConfirmed");
-  if (isConfirmed) {
-    changeStyle(preset);
-    return;
-  }
+  if (isConfirmed) return changeStyle(preset);
 
   confirmationDialog({
     title: "Change style preset",
@@ -102,8 +126,8 @@ function requestStylePresetChange(preset) {
 
 async function changeStyle(desiredPreset) {
   const styleData = await getStylePreset(desiredPreset);
-  const [appliedPreset, style] = styleData;
-  localStorage.setItem("presetStyle", appliedPreset);
+  const [presetName, style] = styleData;
+  localStorage.setItem("presetStyle", presetName);
   applyStyleWithUiRefresh(style);
 }
 
@@ -116,6 +140,9 @@ function applyStyleWithUiRefresh(style) {
 
   invokeActiveZooming();
   setPresetRemoveButtonVisibiliy();
+
+  drawScaleBar(scaleBar, scale);
+  fitScaleBar(scaleBar, svgWidth, svgHeight);
 }
 
 function addStylePreset() {
@@ -145,8 +172,31 @@ function addStylePreset() {
       "#stateBorders": ["opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "filter"],
       "#provinceBorders": ["opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "filter"],
       "#cells": ["opacity", "stroke", "stroke-width", "filter", "mask"],
-      "#gridOverlay": ["opacity", "scale", "dx", "dy", "type", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "transform", "filter", "mask"],
-      "#coordinates": ["opacity", "data-size", "font-size", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "filter", "mask"],
+      "#gridOverlay": [
+        "opacity",
+        "scale",
+        "dx",
+        "dy",
+        "type",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap",
+        "transform",
+        "filter",
+        "mask"
+      ],
+      "#coordinates": [
+        "opacity",
+        "data-size",
+        "font-size",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap",
+        "filter",
+        "mask"
+      ],
       "#compass": ["opacity", "transform", "filter", "mask", "shape-rendering"],
       "#rose": ["transform"],
       "#relig": ["opacity", "stroke", "stroke-width", "filter"],
@@ -174,27 +224,110 @@ function addStylePreset() {
       "#statesBody": ["opacity", "filter"],
       "#statesHalo": ["opacity", "data-width", "stroke-width", "filter"],
       "#provs": ["opacity", "fill", "font-size", "font-family", "filter"],
-      "#temperature": ["opacity", "font-size", "fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "filter"],
+      "#temperature": [
+        "opacity",
+        "font-size",
+        "fill",
+        "fill-opacity",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap",
+        "filter"
+      ],
       "#ice": ["opacity", "fill", "stroke", "stroke-width", "filter"],
       "#emblems": ["opacity", "stroke-width", "filter"],
-      "#texture": ["opacity", "filter", "mask"],
-      "#textureImage": ["x", "y"],
+      "#texture": ["opacity", "filter", "mask", "data-x", "data-y", "data-href"],
       "#zones": ["opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "filter", "mask"],
       "#oceanLayers": ["filter", "layers"],
       "#oceanBase": ["fill"],
       "#oceanicPattern": ["href", "opacity"],
-      "#terrs": ["opacity", "scheme", "terracing", "skip", "relax", "curve", "filter", "mask"],
-      "#legend": ["data-size", "font-size", "font-family", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "data-x", "data-y", "data-columns"],
+      "#terrs #oceanHeights": [
+        "data-render",
+        "opacity",
+        "scheme",
+        "terracing",
+        "skip",
+        "relax",
+        "curve",
+        "filter",
+        "mask"
+      ],
+      "#terrs #landHeights": ["opacity", "scheme", "terracing", "skip", "relax", "curve", "filter", "mask"],
+      "#legend": [
+        "data-size",
+        "font-size",
+        "font-family",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap",
+        "data-x",
+        "data-y",
+        "data-columns"
+      ],
       "#legendBox": ["fill", "fill-opacity"],
       "#burgLabels > #cities": ["opacity", "fill", "text-shadow", "data-size", "font-size", "font-family"],
-      "#burgIcons > #cities": ["opacity", "fill", "fill-opacity", "size", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap"],
+      "#burgIcons > #cities": [
+        "opacity",
+        "fill",
+        "fill-opacity",
+        "size",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap"
+      ],
       "#anchors > #cities": ["opacity", "fill", "size", "stroke", "stroke-width"],
       "#burgLabels > #towns": ["opacity", "fill", "text-shadow", "data-size", "font-size", "font-family"],
-      "#burgIcons > #towns": ["opacity", "fill", "fill-opacity", "size", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap"],
+      "#burgIcons > #towns": [
+        "opacity",
+        "fill",
+        "fill-opacity",
+        "size",
+        "stroke",
+        "stroke-width",
+        "stroke-dasharray",
+        "stroke-linecap"
+      ],
       "#anchors > #towns": ["opacity", "fill", "size", "stroke", "stroke-width"],
-      "#labels > #states": ["opacity", "fill", "stroke", "stroke-width", "text-shadow", "data-size", "font-size", "font-family", "filter"],
-      "#labels > #addedLabels": ["opacity", "fill", "stroke", "stroke-width", "text-shadow", "data-size", "font-size", "font-family", "filter"],
-      "#fogging": ["opacity", "fill", "filter"]
+      "#labels > #states": [
+        "opacity",
+        "fill",
+        "stroke",
+        "stroke-width",
+        "text-shadow",
+        "data-size",
+        "font-size",
+        "font-family",
+        "filter"
+      ],
+      "#labels > #addedLabels": [
+        "opacity",
+        "fill",
+        "stroke",
+        "stroke-width",
+        "text-shadow",
+        "data-size",
+        "font-size",
+        "font-family",
+        "filter"
+      ],
+      "#fogging": ["opacity", "fill", "filter"],
+      "#vignette": ["opacity", "fill", "filter"],
+      "#vignette-rect": ["x", "y", "width", "height", "rx", "ry", "filter"],
+      "#scaleBar": ["opacity", "fill", "font-size", "data-bar-size", "data-x", "data-y", "data-label"],
+      "#scaleBarBack": [
+        "opacity",
+        "fill",
+        "stroke",
+        "stroke-width",
+        "filter",
+        "data-top",
+        "data-right",
+        "data-bottom",
+        "data-left"
+      ]
     };
 
     for (const selector in attributes) {
@@ -238,7 +371,8 @@ function addStylePreset() {
     if (!styleJSON) return tip("Please provide a style JSON", false, "error");
     if (!JSON.isValid(styleJSON)) return tip("JSON string is not valid, please check the format", false, "error");
     if (!desiredName) return tip("Please provide a preset name", false, "error");
-    if (styleSaverTip.innerHTML === "default") return tip("You cannot overwrite default preset, please change the name", false, "error");
+    if (styleSaverTip.innerHTML === "default")
+      return tip("You cannot overwrite default preset, please change the name", false, "error");
 
     const presetName = customPresetPrefix + desiredName;
     applyOption(stylePreset, presetName, desiredName + " [custom]");

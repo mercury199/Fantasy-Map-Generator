@@ -14,6 +14,8 @@ function overviewMarkers() {
   const markersGenerationConfig = document.getElementById("markersGenerationConfig");
   const markersRemoveAll = document.getElementById("markersRemoveAll");
   const markersExport = document.getElementById("markersExport");
+  const markerTypeInput = document.getElementById("addedMarkerType");
+  const markerTypeSelector = document.getElementById("markerTypeSelector");
 
   addLines();
 
@@ -33,8 +35,25 @@ function overviewMarkers() {
     listen(markersAddFromOverview, "click", toggleAddMarker),
     listen(markersGenerationConfig, "click", configMarkersGeneration),
     listen(markersRemoveAll, "click", triggerRemoveAll),
-    listen(markersExport, "click", exportMarkers)
+    listen(markersExport, "click", exportMarkers),
+    listen(markerTypeSelector, "click", toggleMarkerTypeMenu)
   ];
+
+  const types = [{type: "empty", icon: "❓"}, ...Markers.getConfig()];
+  types.forEach(({icon, type}) => {
+    const option = document.createElement("button");
+    option.textContent = `${icon} ${type}`;
+    markerTypeSelectMenu.appendChild(option);
+
+    listeners.push(
+      listen(option, "click", () => {
+        markerTypeSelector.textContent = icon;
+        markerTypeInput.value = type;
+        changeMarkerType();
+        toggleMarkerTypeMenu();
+      })
+    );
+  });
 
   function handleLineClick(ev) {
     const el = ev.target;
@@ -54,8 +73,12 @@ function overviewMarkers() {
         <div data-tip="Marker icon and type" style="width:12em">${icon} ${type}</div>
         <span style="padding-right:.1em" data-tip="Edit marker" class="icon-pencil"></span>
         <span style="padding-right:.1em" data-tip="Focus on marker position" class="icon-dot-circled pointer"></span>
-        <span style="padding-right:.1em" data-tip="Pin marker (display only pinned markers)" class="icon-pin ${pinned ? "" : "inactive"}" pointer"></span>
-        <span style="padding-right:.1em" class="locks pointer ${lock ? "icon-lock" : "icon-lock-open inactive"}" onmouseover="showElementLockTip(event)"></span>
+        <span style="padding-right:.1em" data-tip="Pin marker (display only pinned markers)" class="icon-pin ${
+          pinned ? "" : "inactive"
+        }" pointer"></span>
+        <span style="padding-right:.1em" class="locks pointer ${
+          lock ? "icon-lock" : "icon-lock-open inactive"
+        }" onmouseover="showElementLockTip(event)"></span>
         <span data-tip="Remove marker" class="icon-trash-empty"></span>
       </div>`;
       })
@@ -135,9 +158,19 @@ function overviewMarkers() {
     });
   }
 
+  function toggleMarkerTypeMenu() {
+    document.getElementById("markerTypeSelectMenu").classList.toggle("visible");
+  }
+
   function toggleAddMarker() {
     markersAddFromOverview.classList.toggle("pressed");
     addMarker.click();
+  }
+
+  function changeMarkerType() {
+    if (!markersAddFromOverview.classList.contains("pressed")) {
+      toggleAddMarker();
+    }
   }
 
   function removeMarker(i) {
@@ -170,16 +203,20 @@ function overviewMarkers() {
   }
 
   function exportMarkers() {
-    const headers = "Id,Type,Icon,Name,Note,X,Y\n";
+    const headers = "Id,Type,Icon,Name,Note,X,Y,Latitude,Longitude\n";
     const quote = s => '"' + s.replaceAll('"', '""') + '"';
 
     const body = pack.markers.map(marker => {
       const {i, type, icon, x, y} = marker;
       const id = `marker${i}`;
       const note = notes.find(note => note.id === id);
-      const name = note ? quote(note.name) : 'Unknown';
-      const legend = note ? quote(note.legend) : '';
-      return [id, type, icon, name, legend, x, y].join(",");
+      const name = note ? quote(note.name) : "Unknown";
+      const legend = note ? quote(note.legend) : "";
+
+      const lat = getLatitude(y, 2);
+      const lon = getLongitude(x, 2);
+
+      return [id, type, icon, name, legend, x, y, lat, lon].join(",");
     });
 
     const data = headers + body.join("\n");

@@ -44,7 +44,12 @@ function editEmblem(type, id, el) {
 
   function defineEmblemData(e) {
     const parent = e.target.parentNode;
-    const [g, t] = parent.id === "burgEmblems" ? [pack.burgs, "burg"] : parent.id === "provinceEmblems" ? [pack.provinces, "province"] : [pack.states, "state"];
+    const [g, t] =
+      parent.id === "burgEmblems"
+        ? [pack.burgs, "burg"]
+        : parent.id === "provinceEmblems"
+        ? [pack.provinces, "province"]
+        : [pack.states, "state"];
     const i = +e.target.dataset.i;
     type = t;
     id = type + "COA" + i;
@@ -88,8 +93,12 @@ function editEmblem(type, id, el) {
 
     emblemBurgs.options.length = 0;
     emblemBurgs.options.add(new Option("", 0, false, !burg));
-    const burgList = validBurgs.filter(burg => (province ? pack.cells.province[burg.cell] === province : burg.state === state));
-    burgList.forEach(b => emblemBurgs.options.add(new Option(b.capital ? "👑 " + b.name : b.name, b.i, false, b.i === burg)));
+    const burgList = validBurgs.filter(burg =>
+      province ? pack.cells.province[burg.cell] === province : burg.state === state
+    );
+    burgList.forEach(b =>
+      emblemBurgs.options.add(new Option(b.capital ? "👑 " + b.name : b.name, b.i, false, b.i === burg))
+    );
     emblemBurgs.options[0].disabled = true;
 
     COArenderer.trigger(id, el.coa);
@@ -103,13 +112,13 @@ function editEmblem(type, id, el) {
     if (type === "burg") name = "Burg of " + name;
     document.getElementById("emblemArmiger").innerText = name;
 
-    if (el.coa === "custom") emblemShapeSelector.disabled = true;
+    if (el.coa.custom) emblemShapeSelector.disabled = true;
     else {
       emblemShapeSelector.disabled = false;
       emblemShapeSelector.value = el.coa.shield;
     }
 
-    const size = el.coaSize || 1;
+    const size = el.coa.size || 1;
     document.getElementById("emblemSizeSlider").value = size;
     document.getElementById("emblemSizeNumber").value = size;
   }
@@ -169,7 +178,9 @@ function editEmblem(type, id, el) {
   }
 
   function changeSize() {
-    const size = (el.coaSize = +this.value);
+    const size = +this.value;
+    el.coa.size = size;
+
     document.getElementById("emblemSizeSlider").value = size;
     document.getElementById("emblemSizeNumber").value = size;
 
@@ -180,8 +191,9 @@ function editEmblem(type, id, el) {
     // re-append use element
     const categotySize = +g.attr("font-size");
     const shift = (categotySize * size) / 2;
-    const x = el.x || el.pole[0];
-    const y = el.y || el.pole[1];
+    const x = el.coa.x || el.x || el.pole[0];
+    const y = el.coa.y || el.y || el.pole[1];
+
     g.append("use")
       .attr("data-i", el.i)
       .attr("x", rn(x - shift), 2)
@@ -211,7 +223,7 @@ function editEmblem(type, id, el) {
   }
 
   function openInArmoria() {
-    const coa = el.coa && el.coa !== "custom" ? el.coa : {t1: "sable"};
+    const coa = el.coa && !el.coa.custom ? el.coa : {t1: "sable"};
     const json = JSON.stringify(coa).replaceAll("#", "%23");
     const url = `https://azgaar.github.io/Armoria/?coa=${json}&from=FMG`;
     openURL(url);
@@ -224,12 +236,15 @@ function editEmblem(type, id, el) {
   }
 
   function upload(type) {
-    const input = type === "image" ? document.getElementById("emblemImageToLoad") : document.getElementById("emblemSVGToLoad");
+    const input =
+      type === "image" ? document.getElementById("emblemImageToLoad") : document.getElementById("emblemSVGToLoad");
     const file = input.files[0];
     input.value = "";
 
     if (file.size > 500000) {
-      tip(`File is too big, please optimize file size up to 500kB and re-upload. Recommended size is 200x200 px and up to 100kB`, true, "error", 5000);
+      const message =
+        "File is too big, please optimize file size up to 500kB and re-upload. Recommended size is 200x200 px and up to 100kB";
+      tip(message, true, "error", 5000);
       return;
     }
 
@@ -238,37 +253,44 @@ function editEmblem(type, id, el) {
     reader.onload = function (readerEvent) {
       const result = readerEvent.target.result;
       const defs = document.getElementById("defs-emblems");
-      const coa = document.getElementById(id); // old emblem
+      const oldEmblem = document.getElementById(id);
 
-      if (type === "image") {
-        const svg = `<svg id="${id}" xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><image x="0" y="0" width="200" height="200" href="${result}"/></svg>`;
-        defs.insertAdjacentHTML("beforeend", svg);
-      } else {
+      let href = result; // raster images
+      if (type === "svg") {
         const el = document.createElement("html");
         el.innerHTML = result;
 
-        // remove sodipodi and inkscape attributes
         el.querySelectorAll("*").forEach(el => {
-          const attributes = el.getAttributeNames();
-          attributes.forEach(attr => {
+          if (el.id === "adobe_illustrator_pgf") el.remove(); // remove Adobe Illustrator inner data
+
+          el.getAttributeNames().forEach(attr => {
+            // remove sodipodi and inkscape attributes
             if (attr.includes("inkscape") || attr.includes("sodipodi")) el.removeAttribute(attr);
           });
         });
 
         const svg = el.querySelector("svg");
         if (!svg) {
-          tip("The file should be prepated for load to FMG. Please use Armoria or other relevant tools", false, "error");
+          const message = "The file is not a valid SVG. Please use Armoria or other relevant tools";
+          tip(message, false, "error");
           return;
         }
 
-        const newEmblem = defs.appendChild(svg);
-        newEmblem.id = id;
-        newEmblem.setAttribute("width", 200);
-        newEmblem.setAttribute("height", 200);
+        const serialized = new XMLSerializer().serializeToString(svg);
+        href = "data:image/svg+xml;base64," + window.btoa(serialized);
       }
 
-      if (coa) coa.remove(); // remove old emblem
-      el.coa = "custom";
+      const svg = `<svg id="${id}" viewBox="0 0 200 200"><image width="200" height="200" href="${href}"/></svg>`;
+      defs.insertAdjacentHTML("beforeend", svg);
+
+      if (oldEmblem) oldEmblem.remove();
+
+      const customCoa = {custom: true};
+      if (el.coa.size) customCoa.size = el.coa.size;
+      if (el.coa.x) customCoa.x = el.coa.x;
+      if (el.coa.y) customCoa.y = el.coa.y;
+      el.coa = customCoa;
+
       emblemShapeSelector.disabled = true;
     };
 
@@ -351,7 +373,9 @@ function editEmblem(type, id, el) {
         validStates
           .map(state => {
             const el = document.getElementById("stateCOA" + state.i);
-            return `<figure id="state_${state.i}"><a href="#provinces_${state.i}"><figcaption>${state.fullName}</figcaption>${getSVG(el, 200)}</a></figure>`;
+            return `<figure id="state_${state.i}"><a href="#provinces_${state.i}"><figcaption>${
+              state.fullName
+            }</figcaption>${getSVG(el, 200)}</a></figure>`;
           })
           .join("") +
         `</div>`;
@@ -362,13 +386,14 @@ function editEmblem(type, id, el) {
           const figures = stateProvinces
             .map(province => {
               const el = document.getElementById("provinceCOA" + province.i);
-              return `<figure id="province_${province.i}"><a href="#burgs_${province.i}"><figcaption>${province.fullName}</figcaption>${getSVG(
-                el,
-                200
-              )}</a></figure>`;
+              return `<figure id="province_${province.i}"><a href="#burgs_${province.i}"><figcaption>${
+                province.fullName
+              }</figcaption>${getSVG(el, 200)}</a></figure>`;
             })
             .join("");
-          return stateProvinces.length ? `<div id="provinces_${state.i}">${back}<h2>${state.fullName} provinces</h2>${figures}</div>` : "";
+          return stateProvinces.length
+            ? `<div id="provinces_${state.i}">${back}<h2>${state.fullName} provinces</h2>${figures}</div>`
+            : "";
         })
         .join("");
 
@@ -385,7 +410,9 @@ function editEmblem(type, id, el) {
                   return `<figure id="burg_${burg.i}"><figcaption>${burg.name}</figcaption>${getSVG(el, 200)}</figure>`;
                 })
                 .join("");
-              return provinceBurgs.length ? `<div id="burgs_${province.i}">${back}<h2>${province.fullName} burgs</h2>${provinceBurgFigures}</div>` : "";
+              return provinceBurgs.length
+                ? `<div id="burgs_${province.i}">${back}<h2>${province.fullName} burgs</h2>${provinceBurgFigures}</div>`
+                : "";
             })
             .join("");
 
@@ -464,7 +491,7 @@ function editEmblem(type, id, el) {
             }
             div > a {
               float: right;
-              font-family: monospace;
+              font-family: var(--monospace);
               margin-top: 0.8em;
             }
           </style>
@@ -491,13 +518,21 @@ function editEmblem(type, id, el) {
   }
 
   function dragEmblem() {
-    const tr = parseTransform(this.getAttribute("transform"));
-    const x = +tr[0] - d3.event.x,
-      y = +tr[1] - d3.event.y;
+    const x = Number(this.getAttribute("x")) - d3.event.x;
+    const y = Number(this.getAttribute("y")) - d3.event.y;
 
     d3.event.on("drag", function () {
-      const transform = `translate(${x + d3.event.x},${y + d3.event.y})`;
-      this.setAttribute("transform", transform);
+      this.setAttribute("x", x + d3.event.x);
+      this.setAttribute("y", y + d3.event.y);
+    });
+
+    d3.event.on("end", function () {
+      const categotySize = Number(this.parentNode.getAttribute("font-size"));
+      const size = el.coa.size || 1;
+      const shift = (categotySize * size) / 2;
+
+      el.coa.x = rn(x + d3.event.x + shift, 2);
+      el.coa.y = rn(y + d3.event.y + shift, 2);
     });
   }
 

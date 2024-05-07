@@ -1,3 +1,24 @@
+:root {
+  --monospace: Consolas, monospace;
+  --serif: Georgia, serif;
+  --sans-serif: Helvetica, Arial, sans-serif;
+}
+
+/* hide Google translate header */
+body > .skiptranslate {
+  display: none;
+}
+
+/* hide Google translate in-progress widget */
+body > .skiptranslate + div {
+  display: none;
+}
+
+/* make translated text wrapper non-blocking */
+font {
+  pointer-events: none;
+}
+
 input,
 select,
 button {
@@ -119,7 +140,7 @@ a {
 }
 
 #temperature {
-  font-family: sans-serif;
+  font-family: var(--sans-serif);
   font-weight: 700;
   text-anchor: middle;
   dominant-baseline: central;
@@ -148,6 +169,7 @@ t,
 #temperature,
 #texture,
 #landmass,
+#vignette,
 #fogging {
   pointer-events: none;
 }
@@ -160,7 +182,7 @@ t,
   text-shadow: 0 0 4px #000;
   dominant-baseline: central;
   text-anchor: middle;
-  font-family: Helvetica;
+  font-family: var(--sans-serif);
   fill-opacity: 1;
 }
 
@@ -242,14 +264,14 @@ i.icon-lock {
 }
 
 #labels {
-  text-anchor: start;
+  text-anchor: middle;
   dominant-baseline: central;
   cursor: pointer;
 }
 
 .chartInfo {
   text-align: center;
-  font-family: sans-serif;
+  font-family: var(--sans-serif);
   font-style: italic;
   font-size: 12px;
 }
@@ -356,7 +378,7 @@ text.drag {
 
 #options {
   position: absolute;
-  font-family: Consolas, monospace;
+  font-family: var(--monospace);
   border: solid 1px #5e4fa2;
   margin: 10px;
   padding-bottom: 0.3em;
@@ -366,7 +388,7 @@ text.drag {
 #options input,
 #options select,
 #options button {
-  font-family: Consolas, monospace;
+  font-family: var(--monospace);
 }
 
 #collapsible {
@@ -387,7 +409,7 @@ text.drag {
 
 div.tab > button#optionsHide {
   width: auto;
-  font-family: Arial;
+  font-family: var(--sans-serif);
   padding: 0.6em 0.45em;
 }
 
@@ -421,6 +443,7 @@ button.options:hover {
 
 #aboutContent p {
   font-weight: normal;
+  font-style: normal;
 }
 
 #aboutContent a {
@@ -590,6 +613,11 @@ input[type="color"]::-webkit-color-swatch-wrapper {
   width: 100%;
 }
 
+#loadGoogleTranslateButton {
+  font-size: smaller;
+  padding: 0.4em 0.5em;
+}
+
 #options input[type="color"] {
   width: 2em;
   padding: 1px;
@@ -598,7 +626,7 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 .tabcontent button.sideButton {
   border-radius: 15%;
   font-size: 0.8em;
-  margin-bottom: -1em;
+  margin-block: -1em;
 }
 
 #layersContent button.active,
@@ -657,7 +685,7 @@ input[type="color"]::-webkit-color-swatch-wrapper {
   border: none;
   padding: 0.45em 0.75em;
   margin: 0.4em 0;
-  font-family: Consolas, monospace;
+  font-family: var(--monospace);
   animation: glowing 2s infinite;
 }
 
@@ -690,6 +718,11 @@ input[type="color"]::-webkit-color-swatch-wrapper {
   margin: 0.35em 0;
   transition: 0.1s;
   font-size: 1em;
+  text-transform: capitalize;
+
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .tabcontent button.pressed {
@@ -743,6 +776,11 @@ fieldset {
   float: left;
   width: 28%;
   text-align: center;
+  text-transform: capitalize;
+
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .tabcontent .buttonoff {
@@ -936,7 +974,7 @@ fieldset {
   padding: 0.1em 0.5em;
   float: left;
   font-size: 1.2em;
-  font-family: monospace;
+  font-family: var(--monospace);
 }
 
 #brushesButtons > button {
@@ -980,7 +1018,7 @@ fieldset {
 
 #templateBody > div > span {
   float: right;
-  margin: 0 1px 0 0.5px;
+  margin-inline: 1px;
 }
 
 #templateBody > div > i {
@@ -989,14 +1027,13 @@ fieldset {
 
 #templateBody input,
 #templateBody select {
-  width: 4em;
+  width: 4.5em;
   height: 1em;
   border: 0;
-  font-size: 0.95em;
   background-color: #ffffff95;
   color: #05044d;
   font-style: italic;
-  font-family: monospace;
+  font-family: var(--monospace);
 }
 
 #templateBody select {
@@ -1083,9 +1120,13 @@ tr.battleSurvivors {
   font-size: 0.9em;
 }
 
-#battleBody div.battlePhases,
 #battleBottom div.battleTypes {
   position: fixed;
+  background-color: #ffffff30;
+}
+
+#battleBody div.battlePhases {
+  position: absolute;
   background-color: #ffffff30;
 }
 
@@ -1303,11 +1344,6 @@ div.slider .ui-slider-handle {
   color: white;
 }
 
-#brushPower,
-#brushRadius {
-  width: 12em;
-}
-
 #rescaleHigher,
 #rescaleLower,
 #rescaleModifier {
@@ -1443,7 +1479,9 @@ div.states .icon-trash-empty,
 div.states .icon-eye,
 div.states .icon-pin,
 div.states .icon-flag-empty,
-div.states .icon-cw {
+div.states .icon-cw,
+div.states .icon-lock,
+div.states .icon-lock-open {
   cursor: pointer;
 }
 
@@ -1595,7 +1633,7 @@ div.states > .riverType {
   padding: 0.3em 0;
 }
 
-#saveTilesScreen div.label {
+#exportToPngTilesScreen div.label {
   display: inline-block;
   width: 5em;
 }
@@ -1694,7 +1732,7 @@ div.states > div.biomeArea {
 #emblemUploadControl,
 #emblemDownloadControl {
   margin-top: 0.3em;
-  text-align: center;
+  width: 100%;
 }
 
 div.editorLine {
@@ -1721,7 +1759,7 @@ div.editorLine {
   fill: #f8ffff;
   font-size: 12px;
   font-weight: bold;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--sans-serif);
   cursor: move !important;
 }
 
@@ -1734,7 +1772,7 @@ div.editorLine {
 #pickerCloseText {
   fill: #f8ffff;
   font-size: 10px;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--sans-serif);
   pointer-events: none;
 }
 
@@ -1838,12 +1876,6 @@ div.editorLine {
   margin: 0.4em 0 0 -0.9em;
 }
 
-#barBackColor {
-  width: 3.5em;
-  padding: 0px;
-  height: 1.2em;
-}
-
 #ruler {
   cursor: move;
   fill: none;
@@ -1869,7 +1901,7 @@ div.editorLine {
 }
 
 #ruler text {
-  font-family: "Georgia";
+  font-family: var(--serif);
   fill: #3d3d3d;
   text-anchor: middle;
   text-shadow: 0 0 4px white;
@@ -1881,18 +1913,6 @@ div.editorLine {
   fill-rule: evenodd;
   fill-opacity: 0.5;
   stroke: #737373;
-}
-
-#scaleBar {
-  stroke: none;
-  fill: none;
-  cursor: pointer;
-}
-
-#scaleBar text {
-  fill: #353540;
-  text-anchor: middle;
-  font-family: Georgia;
 }
 
 #militaryOptionsTable select {
@@ -1918,7 +1938,7 @@ div.editorLine {
 
 #coordinateLabels {
   fill: #333333;
-  font-family: monospace;
+  font-family: var(--monospace);
   text-shadow: 0 0 4px white;
   stroke-width: 0;
   dominant-baseline: central;
@@ -1953,7 +1973,7 @@ input[type="checkbox"] {
 .checkbox + .checkbox-label:before {
   content: "";
   display: inline-block;
-  vertical-align: middle;
+  vertical-align: bottom;
   width: 0.6em;
   height: 0.6em;
   padding: 0.2em;
@@ -1961,6 +1981,7 @@ input[type="checkbox"] {
   border: 1px solid darkgrey;
   border-radius: 15%;
   background: white;
+  font-family: var(--monospace);
 }
 
 .checkbox:checked + .checkbox-label:before {
@@ -1973,7 +1994,7 @@ input[type="checkbox"] {
 div.textual select,
 div.textual textarea,
 div.textual input {
-  font-family: monospace;
+  font-family: var(--monospace);
 }
 
 div.textual fieldset {
@@ -1988,13 +2009,13 @@ div.textual span,
 }
 
 #namesbaseExamples {
-  font-family: monospace;
+  font-family: var(--monospace);
   cursor: pointer;
 }
 
 #markers {
   cursor: pointer;
-  font-family: monospace;
+  font-family: var(--monospace);
   user-select: none;
   text-anchor: middle;
   dominant-baseline: central;
@@ -2040,7 +2061,6 @@ div.textual span,
 }
 
 #notesBody > iframe {
-  pointer-events: none;
   user-select: none;
 }
 
@@ -2049,11 +2069,12 @@ div.textual span,
 }
 
 #notesLegend {
+  width: auto;
   height: 87%;
   outline: 0;
   overflow-y: auto;
   padding: 0.6em;
-  font-family: monospace;
+  font-family: var(--monospace);
   background-color: #fff;
   border: 1px solid #dedede;
   color: #000;
@@ -2183,14 +2204,14 @@ svg.button {
 #globaAxisLabels {
   font-style: italic;
   font-size: 9px;
-  font-family: monospace;
+  font-family: var(--monospace);
   stroke: none;
   fill: #001754;
 }
 
 #globeLatLabels {
   font-size: 12px;
-  font-family: monospace;
+  font-family: var(--monospace);
   stroke: none;
   fill: #001754;
 }
@@ -2243,7 +2264,6 @@ svg.button {
   user-select: none;
 }
 
-
 .dontAsk {
   margin: 0.9em 0 0 0.6em;
   display: inline-flex;
@@ -2252,7 +2272,7 @@ svg.button {
 
 #errorBox {
   font-size: 0.9em;
-  font-family: Consolas, monospace;
+  font-family: var(--monospace);
   color: #920303;
   background-color: #dabdbd91;
   padding: 2px;
@@ -2287,7 +2307,7 @@ svg.button {
 #promptText {
   padding: 0 0 0.6em 0;
   font-weight: bold;
-  font-family: sans-serif;
+  font-family: var(--sans-serif);
 }
 
 #mapOverlay {
@@ -2320,6 +2340,41 @@ svg.button {
   opacity: 0.8;
 }
 
+#markerTypeSelector {
+  font-size: 0.85em;
+}
+
+#markerTypeSelectorWrapper {
+  position: relative;
+}
+
+#markerTypeSelectMenu {
+  display: none;
+}
+
+#markerTypeSelectMenu.visible {
+  display: block;
+  position: absolute;
+  height: 250px;
+  width: 170px;
+  overflow-y: scroll;
+  background: inherit;
+  bottom: 100%;
+  left: 0;
+  background: white;
+}
+
+#markerTypeSelectMenu > button {
+  display: block;
+  width: 100%;
+  border: 1px solid #ddd;
+  margin-bottom: 1px;
+}
+
+#markerTypeSelectMenu > button:hover {
+  background: #ccc;
+}
+
 @media print {
   div,
   canvas {
@@ -2342,7 +2397,7 @@ svg.button {
 }
 
 @media (prefers-color-scheme: dark) {
-    body {
-        background: #25252a;
-    }
+  body {
+    background: #25252a;
+  }
 }

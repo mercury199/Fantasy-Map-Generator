@@ -6,7 +6,8 @@ window.Cultures = (function () {
   const generate = function () {
     TIME && console.time("generateCultures");
     cells = pack.cells;
-    cells.culture = new Uint16Array(cells.i.length); // cell cultures
+
+    const cultureIds = new Uint16Array(cells.i.length); // cell cultures
     let count = Math.min(+culturesInput.value, +culturesSet.selectedOptions[0].dataset.max);
 
     const populated = cells.i.filter(i => cells.s[i]); // populated cells
@@ -15,9 +16,12 @@ window.Cultures = (function () {
       if (!count) {
         WARN && console.warn(`There are no populated cells. Cannot generate cultures`);
         pack.cultures = [{name: "Wildlands", i: 0, base: 1, shield: "round"}];
-        alertMessage.innerHTML = /* html */ ` The climate is harsh and people cannot live in this world.<br />
+        cells.culture = cultureIds;
+
+        alertMessage.innerHTML = /* html */ `The climate is harsh and people cannot live in this world.<br />
           No cultures, states and burgs will be created.<br />
           Please consider changing climate settings in the World Configurator`;
+
         $("#alert").dialog({
           resizable: false,
           title: "Extreme climate warning",
@@ -51,32 +55,57 @@ window.Cultures = (function () {
     const emblemShape = document.getElementById("emblemShape").value;
 
     const codes = [];
+
     cultures.forEach(function (c, i) {
-      const cell = (c.center = placeCenter(c.sort ? c.sort : i => cells.s[i]));
-      centers.add(cells.p[cell]);
-      c.i = i + 1;
+      const newId = i + 1;
+
+      if (c.lock) {
+        codes.push(c.code);
+        centers.add(c.center);
+
+        for (const i of cells.i) {
+          if (cells.culture[i] === c.i) cultureIds[i] = newId;
+        }
+
+        c.i = newId;
+        return;
+      }
+
+      const sortingFn = c.sort ? c.sort : i => cells.s[i];
+      const center = placeCenter(sortingFn);
+
+      centers.add(cells.p[center]);
+      c.center = center;
+      c.i = newId;
       delete c.odd;
       delete c.sort;
       c.color = colors[i];
-      c.type = defineCultureType(cell);
+      c.type = defineCultureType(center);
       c.expansionism = defineCultureExpansionism(c.type);
       c.origins = [0];
       c.code = abbreviate(c.name, codes);
       codes.push(c.code);
-      cells.culture[cell] = i + 1;
+      cultureIds[center] = newId;
       if (emblemShape === "random") c.shield = getRandomShield();
     });
 
-    function placeCenter(v) {
-      let c,
-        spacing = (graphWidth + graphHeight) / 2 / count;
-      const sorted = [...populated].sort((a, b) => v(b) - v(a)),
-        max = Math.floor(sorted.length / 2);
-      do {
-        c = sorted[biased(0, max, 5)];
+    cells.culture = cultureIds;
+
+    function placeCenter(sortingFn) {
+      let spacing = (graphWidth + graphHeight) / 2 / count;
+      const MAX_ATTEMPTS = 100;
+
+      const sorted = [...populated].sort((a, b) => sortingFn(b) - sortingFn(a));
+      const max = Math.floor(sorted.length / 2);
+
+      let cellId = 0;
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        cellId = sorted[biased(0, max, 5)];
         spacing *= 0.9;
-      } while (centers.find(cells.p[c][0], cells.p[c][1], spacing) !== undefined);
-      return c;
+        if (!cultureIds[cellId] && !centers.find(cells.p[cellId][0], cells.p[cellId][1], spacing)) break;
+      }
+
+      return cellId;
     }
 
     // the first culture with id 0 is for wildlands
@@ -90,19 +119,25 @@ window.Cultures = (function () {
 
     cultures.forEach(c => (c.base = c.base % nameBases.length));
 
-    function selectCultures(c) {
-      let def = getDefault(c);
-      if (c === def.length) return def;
-      if (def.every(d => d.odd === 1)) return def.splice(0, c);
-
-      const count = Math.min(c, def.length);
+    function selectCultures(culturesNumber) {
+      let def = getDefault(culturesNumber);
       const cultures = [];
 
-      for (let culture, rnd, i = 0; cultures.length < count && i < 200; i++) {
+      pack.cultures?.forEach(function (culture) {
+        if (culture.lock) cultures.push(culture);
+      });
+
+      if (!cultures.length) {
+        if (culturesNumber === def.length) return def;
+        if (def.every(d => d.odd === 1)) return def.splice(0, culturesNumber);
+      }
+
+      for (let culture, rnd, i = 0; cultures.length < culturesNumber && def.length > 0; ) {
         do {
           rnd = rand(def.length - 1);
           culture = def[rnd];
-        } while (!P(culture.odd));
+          i++;
+        } while (i < 200 && !P(culture.odd));
         cultures.push(culture);
         def.splice(rnd, 1);
       }
@@ -155,12 +190,13 @@ window.Cultures = (function () {
       name = Names.getCulture(culture, 5, 8, "");
       base = pack.cultures[culture].base;
     }
+
     const code = abbreviate(
       name,
       pack.cultures.map(c => c.code)
     );
     const i = pack.cultures.length;
-    const color = d3.color(d3.scaleSequential(d3.interpolateRainbow)(Math.random())).hex();
+    const color = getRandomColor();
 
     // define emblem shape
     let shield = culture.shield;
@@ -179,7 +215,7 @@ window.Cultures = (function () {
       area: 0,
       rural: 0,
       urban: 0,
-      origins: [0],
+      origins: [pack.cells.culture[center]],
       code,
       shield
     });
@@ -277,7 +313,8 @@ window.Cultures = (function () {
         {name: "Scythian", base: 24, odd: 0.5, sort: i => n(i) / td(i, 11) ** 0.5 / bd(i, [4]), shield: "round"}, // Iranian
         {name: "Cantabrian", base: 20, odd: 0.5, sort: i => (n(i) / td(i, 16)) * h[i], shield: "oval"}, // Basque
         {name: "Estian", base: 9, odd: 0.2, sort: i => (n(i) / td(i, 5)) * t[i], shield: "pavise"}, // Finnic
-        {name: "Carthaginian", base: 17, odd: 0.3, sort: i => n(i) / td(i, 19) / sf(i), shield: "oval"}, // Berber
+        {name: "Carthaginian", base: 42, odd: 0.3, sort: i => n(i) / td(i, 20) / sf(i), shield: "oval"}, // Levantine
+        {name: "Hebrew", base: 42, odd: 0.2, sort: i => (n(i) / td(i, 19)) * sf(i), shield: "oval"}, // Levantine
         {name: "Mesopotamian", base: 23, odd: 0.2, sort: i => n(i) / td(i, 22) / bd(i, [1, 2, 3]), shield: "oval"} // Mesopotamian
       ];
     }
@@ -468,86 +505,106 @@ window.Cultures = (function () {
       {name: "Kiswaili", base: 28, odd: 0.1, sort: i => n(i) / td(i, 29) / bd(i, [1, 3, 5, 7]), shield: "vesicaPiscis"},
       {name: "Vietic", base: 29, odd: 0.1, sort: i => n(i) / td(i, 25) / bd(i, [7], 7) / t[i], shield: "banner"},
       {name: "Guantzu", base: 30, odd: 0.1, sort: i => n(i) / td(i, 17), shield: "banner"},
-      {name: "Ulus", base: 31, odd: 0.1, sort: i => (n(i) / td(i, 5) / bd(i, [2, 4, 10], 7)) * t[i], shield: "banner"}
+      {name: "Ulus", base: 31, odd: 0.1, sort: i => (n(i) / td(i, 5) / bd(i, [2, 4, 10], 7)) * t[i], shield: "banner"},
+      {name: "Hebrew", base: 42, odd: 0.2, sort: i => (n(i) / td(i, 18)) * sf(i), shield: "oval"} // Levantine
     ];
   };
 
   // expand cultures across the map (Dijkstra-like algorithm)
   const expand = function () {
     TIME && console.time("expandCultures");
-    cells = pack.cells;
+    const {cells, cultures} = pack;
 
-    const queue = new PriorityQueue({comparator: (a, b) => a.p - b.p});
-    pack.cultures.forEach(function (c) {
-      if (!c.i || c.removed) return;
-      queue.queue({e: c.center, p: 0, c: c.i});
-    });
-
-    const neutral = (cells.i.length / 5000) * 3000 * neutralInput.value; // limit cost for culture growth
+    const queue = new PriorityQueue({comparator: (a, b) => a.priority - b.priority});
     const cost = [];
+
+    const neutralRate = byId("neutralRate")?.valueAsNumber || 1;
+    const maxExpansionCost = cells.i.length * 0.6 * neutralRate; // limit cost for culture growth
+
+    // remove culture from all cells except of locked
+    const hasLocked = cultures.some(c => !c.removed && c.lock);
+    if (hasLocked) {
+      for (const cellId of cells.i) {
+        const culture = cultures[cells.culture[cellId]];
+        if (culture.lock) continue;
+        cells.culture[cellId] = 0;
+      }
+    } else {
+      cells.culture = new Uint16Array(cells.i.length);
+    }
+
+    for (const culture of cultures) {
+      if (!culture.i || culture.removed || culture.lock) continue;
+      queue.queue({cellId: culture.center, cultureId: culture.i, priority: 0});
+    }
+
     while (queue.length) {
-      const next = queue.dequeue(),
-        n = next.e,
-        p = next.p,
-        c = next.c;
-      const type = pack.cultures[c].type;
-      cells.c[n].forEach(function (e) {
-        const biome = cells.biome[e];
-        const biomeCost = getBiomeCost(c, biome, type);
-        const biomeChangeCost = biome === cells.biome[n] ? 0 : 20; // penalty on biome change
-        const heightCost = getHeightCost(e, cells.h[e], type);
-        const riverCost = getRiverCost(cells.r[e], e, type);
-        const typeCost = getTypeCost(cells.t[e], type);
-        const totalCost =
-          p + (biomeCost + biomeChangeCost + heightCost + riverCost + typeCost) / pack.cultures[c].expansionism;
+      const {cellId, priority, cultureId} = queue.dequeue();
+      const {type, expansionism} = cultures[cultureId];
 
-        if (totalCost > neutral) return;
+      cells.c[cellId].forEach(neibCellId => {
+        if (hasLocked) {
+          const neibCultureId = cells.culture[neibCellId];
+          if (neibCultureId && cultures[neibCultureId].lock) return; // do not overwrite cell of locked culture
+        }
 
-        if (!cost[e] || totalCost < cost[e]) {
-          if (cells.s[e] > 0) cells.culture[e] = c; // assign culture to populated cell
-          cost[e] = totalCost;
-          queue.queue({e, p: totalCost, c});
+        const biome = cells.biome[neibCellId];
+        const biomeCost = getBiomeCost(cultureId, biome, type);
+        const biomeChangeCost = biome === cells.biome[neibCellId] ? 0 : 20; // penalty on biome change
+        const heightCost = getHeightCost(neibCellId, cells.h[neibCellId], type);
+        const riverCost = getRiverCost(cells.r[neibCellId], neibCellId, type);
+        const typeCost = getTypeCost(cells.t[neibCellId], type);
+
+        const cellCost = (biomeCost + biomeChangeCost + heightCost + riverCost + typeCost) / expansionism;
+        const totalCost = priority + cellCost;
+
+        if (totalCost > maxExpansionCost) return;
+
+        if (!cost[neibCellId] || totalCost < cost[neibCellId]) {
+          if (cells.pop[neibCellId] > 0) cells.culture[neibCellId] = cultureId; // assign culture to populated cell
+          cost[neibCellId] = totalCost;
+          queue.queue({cellId: neibCellId, cultureId, priority: totalCost});
         }
       });
     }
 
+    function getBiomeCost(c, biome, type) {
+      if (cells.biome[cultures[c].center] === biome) return 10; // tiny penalty for native biome
+      if (type === "Hunting") return biomesData.cost[biome] * 5; // non-native biome penalty for hunters
+      if (type === "Nomadic" && biome > 4 && biome < 10) return biomesData.cost[biome] * 10; // forest biome penalty for nomads
+      return biomesData.cost[biome] * 2; // general non-native biome penalty
+    }
+
+    function getHeightCost(i, h, type) {
+      const f = pack.features[cells.f[i]],
+        a = cells.area[i];
+      if (type === "Lake" && f.type === "lake") return 10; // no lake crossing penalty for Lake cultures
+      if (type === "Naval" && h < 20) return a * 2; // low sea/lake crossing penalty for Naval cultures
+      if (type === "Nomadic" && h < 20) return a * 50; // giant sea/lake crossing penalty for Nomads
+      if (h < 20) return a * 6; // general sea/lake crossing penalty
+      if (type === "Highland" && h < 44) return 3000; // giant penalty for highlanders on lowlands
+      if (type === "Highland" && h < 62) return 200; // giant penalty for highlanders on lowhills
+      if (type === "Highland") return 0; // no penalty for highlanders on highlands
+      if (h >= 67) return 200; // general mountains crossing penalty
+      if (h >= 44) return 30; // general hills crossing penalty
+      return 0;
+    }
+
+    function getRiverCost(riverId, cellId, type) {
+      if (type === "River") return riverId ? 0 : 100; // penalty for river cultures
+      if (!riverId) return 0; // no penalty for others if there is no river
+      return minmax(cells.fl[cellId] / 10, 20, 100); // river penalty from 20 to 100 based on flux
+    }
+
+    function getTypeCost(t, type) {
+      if (t === 1) return type === "Naval" || type === "Lake" ? 0 : type === "Nomadic" ? 60 : 20; // penalty for coastline
+      if (t === 2) return type === "Naval" || type === "Nomadic" ? 30 : 0; // low penalty for land level 2 for Navals and nomads
+      if (t !== -1) return type === "Naval" || type === "Lake" ? 100 : 0; // penalty for mainland for navals
+      return 0;
+    }
+
     TIME && console.timeEnd("expandCultures");
   };
-
-  function getBiomeCost(c, biome, type) {
-    if (cells.biome[pack.cultures[c].center] === biome) return 10; // tiny penalty for native biome
-    if (type === "Hunting") return biomesData.cost[biome] * 5; // non-native biome penalty for hunters
-    if (type === "Nomadic" && biome > 4 && biome < 10) return biomesData.cost[biome] * 10; // forest biome penalty for nomads
-    return biomesData.cost[biome] * 2; // general non-native biome penalty
-  }
-
-  function getHeightCost(i, h, type) {
-    const f = pack.features[cells.f[i]],
-      a = cells.area[i];
-    if (type === "Lake" && f.type === "lake") return 10; // no lake crossing penalty for Lake cultures
-    if (type === "Naval" && h < 20) return a * 2; // low sea/lake crossing penalty for Naval cultures
-    if (type === "Nomadic" && h < 20) return a * 50; // giant sea/lake crossing penalty for Nomads
-    if (h < 20) return a * 6; // general sea/lake crossing penalty
-    if (type === "Highland" && h < 44) return 3000; // giant penalty for highlanders on lowlands
-    if (type === "Highland" && h < 62) return 200; // giant penalty for highlanders on lowhills
-    if (type === "Highland") return 0; // no penalty for highlanders on highlands
-    if (h >= 67) return 200; // general mountains crossing penalty
-    if (h >= 44) return 30; // general hills crossing penalty
-    return 0;
-  }
-
-  function getRiverCost(r, i, type) {
-    if (type === "River") return r ? 0 : 100; // penalty for river cultures
-    if (!r) return 0; // no penalty for others if there is no river
-    return minmax(cells.fl[i] / 10, 20, 100); // river penalty from 20 to 100 based on flux
-  }
-
-  function getTypeCost(t, type) {
-    if (t === 1) return type === "Naval" || type === "Lake" ? 0 : type === "Nomadic" ? 60 : 20; // penalty for coastline
-    if (t === 2) return type === "Naval" || type === "Nomadic" ? 30 : 0; // low penalty for land level 2 for Navals and nomads
-    if (t !== -1) return type === "Naval" || type === "Lake" ? 100 : 0; // penalty for mainland for navals
-    return 0;
-  }
 
   const getRandomShield = function () {
     const type = rw(COA.shields.types);

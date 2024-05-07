@@ -2,7 +2,9 @@
 // FMG utils related to graph
 
 // check if new grid graph should be generated or we can use the existing one
-function shouldRegenerateGrid(grid) {
+function shouldRegenerateGrid(grid, expectedSeed) {
+  if (expectedSeed && expectedSeed !== grid.seed) return true;
+
   const cellsDesired = +byId("pointsInput").dataset.cells;
   if (cellsDesired !== grid.cellsDesired) return true;
 
@@ -17,7 +19,7 @@ function generateGrid() {
   Math.random = aleaPRNG(seed); // reset PRNG
   const {spacing, cellsDesired, boundary, points, cellsX, cellsY} = placePoints();
   const {cells, vertices} = calculateVoronoi(points, boundary);
-  return {spacing, cellsDesired, boundary, points, cellsX, cellsY, cells, vertices};
+  return {spacing, cellsDesired, boundary, points, cellsX, cellsY, cells, vertices, seed};
 }
 
 // place random points to calculate Voronoi diagram
@@ -96,7 +98,10 @@ function getJitteredGrid(width, height, spacing) {
 
 // return cell index on a regular square grid
 function findGridCell(x, y, grid) {
-  return Math.floor(Math.min(y / grid.spacing, grid.cellsY - 1)) * grid.cellsX + Math.floor(Math.min(x / grid.spacing, grid.cellsX - 1));
+  return (
+    Math.floor(Math.min(y / grid.spacing, grid.cellsY - 1)) * grid.cellsX +
+    Math.floor(Math.min(x / grid.spacing, grid.cellsX - 1))
+  );
 }
 
 // return array of cell indexes in radius on a regular square grid
@@ -132,6 +137,7 @@ function find(x, y, radius = Infinity) {
 
 // return closest cell index
 function findCell(x, y, radius = Infinity) {
+  if (!pack.cells?.q) return;
   const found = pack.cells.q.find(x, y, radius);
   return found ? found[2] : undefined;
 }
@@ -246,7 +252,14 @@ void (function addFindAll() {
       i++;
 
       // Stop searching if this quadrant can’t contain a closer node.
-      if (!(t.node = t.q.node) || (t.x1 = t.q.x0) > t.x3 || (t.y1 = t.q.y0) > t.y3 || (t.x2 = t.q.x1) < t.x0 || (t.y2 = t.q.y1) < t.y0) continue;
+      if (
+        !(t.node = t.q.node) ||
+        (t.x1 = t.q.x0) > t.x3 ||
+        (t.y1 = t.q.y0) > t.y3 ||
+        (t.x2 = t.q.x1) < t.x0 ||
+        (t.y2 = t.q.y1) < t.y0
+      )
+        continue;
 
       // Bisect the current quadrant.
       if (t.node.length) {
@@ -312,11 +325,12 @@ function drawCellsValue(data) {
     .text(d => d);
 }
 
-// helper function non-used for the generation
+// helper function non-used for the main generation
 function drawPolygons(data) {
-  const max = d3.max(data),
-    min = d3.min(data),
-    scheme = getColorScheme(terrs.attr("scheme"));
+  const max = d3.max(data);
+  const min = d3.min(data);
+  const scheme = getColorScheme(terrs.select("#landHeights").attr("scheme"));
+
   data = data.map(d => 1 - normalize(d, min, max));
 
   debug.selectAll("polygon").remove();
@@ -325,7 +339,32 @@ function drawPolygons(data) {
     .data(data)
     .enter()
     .append("polygon")
-    .attr("points", (d, i) => getPackPolygon(i))
+    .attr("points", (d, i) => getGridPolygon(i))
     .attr("fill", d => scheme(d))
     .attr("stroke", d => scheme(d));
+}
+
+// draw raster heightmap preview (not used in main generation)
+function drawHeights({heights, width, height, scheme, renderOcean}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const imageData = ctx.createImageData(width, height);
+
+  const getHeight = height => (height < 20 ? (renderOcean ? height : 0) : height);
+
+  for (let i = 0; i < heights.length; i++) {
+    const color = scheme(1 - getHeight(heights[i]) / 100);
+    const {r, g, b} = d3.color(color);
+
+    const n = i * 4;
+    imageData.data[n] = r;
+    imageData.data[n + 1] = g;
+    imageData.data[n + 2] = b;
+    imageData.data[n + 3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
 }

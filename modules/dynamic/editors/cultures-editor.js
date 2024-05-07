@@ -24,7 +24,7 @@ export function open() {
 
 function insertEditorHtml() {
   const editorHtml = /* html */ `<div id="culturesEditor" class="dialog stable">
-    <div id="culturesHeader" class="header" style="grid-template-columns: 10em 7em 8em 4em 8em 5em 8em 8em">
+    <div id="culturesHeader" class="header" style="grid-template-columns: 10em 7em 9em 4em 8em 5em 7em 8em">
       <div data-tip="Click to sort by culture name" class="sortable alphabetically" data-sortby="name">Culture&nbsp;</div>
       <div data-tip="Click to sort by type" class="sortable alphabetically" data-sortby="type">Type&nbsp;</div>
       <div data-tip="Click to sort by culture namesbase" class="sortable" data-sortby="base">Namesbase&nbsp;</div>
@@ -171,6 +171,7 @@ function culturesEditorAddLines() {
             value="${c.name}" autocorrect="off" spellcheck="false" />
           <span class="icon-cw placeholder"></span>
           <select class="cultureType placeholder">${getTypeOptions(c.type)}</select>
+          <span data-tip="Click to re-generate names for burgs with this culture assigned" class="icon-arrows-cw hide"></span>
           <select data-tip="Culture namesbase. Click to change. Click on arrows to re-generate names"
             class="cultureBase">${getBaseOptions(c.base)}</select>
           <span data-tip="Cells count" class="icon-check-empty hide"></span>
@@ -181,8 +182,7 @@ function culturesEditorAddLines() {
           <div data-tip="Culture area" class="cultureArea hide" style="width: 6em">${si(area)} ${unit}</div>
           <span data-tip="${populationTip}" class="icon-male hide"></span>
           <div data-tip="${populationTip}" class="culturePopulation hide pointer"
-            style="width: 5em">${si(population)}</div>
-          <span data-tip="Click to re-generate names for burgs with this culture assigned" class="icon-arrows-cw hide"></span>
+            style="width: 4em">${si(population)}</div>
           ${getShapeOptions(selectShape, c.shield)}
         </div>`;
       continue;
@@ -207,6 +207,7 @@ function culturesEditorAddLines() {
         <span data-tip="Regenerate culture name" class="icon-cw hiddenIcon" style="visibility: hidden"></span>
         <select data-tip="Culture type. Defines growth model. Click to change"
           class="cultureType">${getTypeOptions(c.type)}</select>
+        <span data-tip="Click to re-generate names for burgs with this culture assigned" class="icon-arrows-cw hide"></span>
         <select data-tip="Culture namesbase. Click to change. Click on arrows to re-generate names"
           class="cultureBase">${getBaseOptions(c.base)}</select>
         <span data-tip="Cells count" class="icon-check-empty hide"></span>
@@ -225,9 +226,9 @@ function culturesEditorAddLines() {
         <div data-tip="Culture area" class="cultureArea hide" style="width: 6em">${si(area)} ${unit}</div>
         <span data-tip="${populationTip}" class="icon-male hide"></span>
         <div data-tip="${populationTip}" class="culturePopulation hide pointer"
-          style="width: 5em">${si(population)}</div>
-        <span data-tip="Click to re-generate names for burgs with this culture assigned" class="icon-arrows-cw hide"></span>
+          style="width: 4em">${si(population)}</div>
         ${getShapeOptions(selectShape, c.shield)}
+        <span data-tip="Lock culture" class="icon-lock${c.lock ? "" : "-open"} hide"></span>
         <span data-tip="Remove culture" class="icon-trash-empty hide"></span>
       </div>`;
   }
@@ -250,13 +251,15 @@ function culturesEditorAddLines() {
   $body.querySelectorAll("fill-box").forEach($el => $el.on("click", cultureChangeColor));
   $body.querySelectorAll("div > input.cultureName").forEach($el => $el.on("input", cultureChangeName));
   $body.querySelectorAll("div > span.icon-cw").forEach($el => $el.on("click", cultureRegenerateName));
-  $body.querySelectorAll("div > input.cultureExpan").forEach($el => $el.on("input", cultureChangeExpansionism));
+  $body.querySelectorAll("div > input.cultureExpan").forEach($el => $el.on("change", cultureChangeExpansionism));
   $body.querySelectorAll("div > select.cultureType").forEach($el => $el.on("change", cultureChangeType));
   $body.querySelectorAll("div > select.cultureBase").forEach($el => $el.on("change", cultureChangeBase));
   $body.querySelectorAll("div > select.cultureEmblems").forEach($el => $el.on("change", cultureChangeEmblemsShape));
   $body.querySelectorAll("div > div.culturePopulation").forEach($el => $el.on("click", changePopulation));
   $body.querySelectorAll("div > span.icon-arrows-cw").forEach($el => $el.on("click", cultureRegenerateBurgs));
   $body.querySelectorAll("div > span.icon-trash-empty").forEach($el => $el.on("click", cultureRemovePrompt));
+  $body.querySelectorAll("div > span.icon-lock").forEach($el => $el.on("click", updateLockStatus));
+  $body.querySelectorAll("div > span.icon-lock-open").forEach($el => $el.on("click", updateLockStatus));
 
   const $culturesHeader = byId("culturesHeader");
   $culturesHeader.querySelector("div[data-sortby='emblems']").style.display = selectShape ? "inline-block" : "none";
@@ -338,10 +341,7 @@ function cultureChangeColor() {
   const callback = newFill => {
     $el.fill = newFill;
     pack.cultures[cultureId].color = newFill;
-    cults
-      .select("#culture" + cultureId)
-      .attr("fill", newFill)
-      .attr("stroke", newFill);
+    cults.select("#culture" + cultureId).attr("fill", newFill);
     debug.select("#cultureCenter" + cultureId).attr("fill", newFill);
   };
 
@@ -398,7 +398,7 @@ function cultureChangeEmblemsShape() {
   };
 
   pack.states.forEach(state => {
-    if (state.culture !== culture || !state.i || state.removed || !state.coa || state.coa === "custom") return;
+    if (state.culture !== culture || !state.i || state.removed || !state.coa || state.coa.custom) return;
     if (shape === state.coa.shield) return;
     state.coa.shield = shape;
     rerenderCOA("stateCOA" + state.i, state.coa);
@@ -410,7 +410,7 @@ function cultureChangeEmblemsShape() {
       !province.i ||
       province.removed ||
       !province.coa ||
-      province.coa === "custom"
+      province.coa.custom
     )
       return;
     if (shape === province.coa.shield) return;
@@ -419,7 +419,7 @@ function cultureChangeEmblemsShape() {
   });
 
   pack.burgs.forEach(burg => {
-    if (burg.culture !== culture || !burg.i || burg.removed || !burg.coa || burg.coa === "custom") return;
+    if (burg.culture !== culture || !burg.i || burg.removed || !burg.coa || burg.coa.custom) return;
     if (shape === burg.coa.shield) return;
     burg.coa.shield = shape;
     rerenderCOA("burgCOA" + burg.i, burg.coa);
@@ -587,16 +587,23 @@ function drawCultureCenters() {
 }
 
 function cultureCenterDrag() {
-  const $el = d3.select(this);
   const cultureId = +this.id.slice(13);
-  d3.event.on("drag", () => {
+  const tr = parseTransform(this.getAttribute("transform"));
+  const x0 = +tr[0] - d3.event.x;
+  const y0 = +tr[1] - d3.event.y;
+
+  function handleDrag() {
     const {x, y} = d3.event;
-    $el.attr("cx", x).attr("cy", y);
+    this.setAttribute("transform", `translate(${x0 + x},${y0 + y})`);
     const cell = findCell(x, y);
     if (pack.cells.h[cell] < 20) return; // ignore dragging on water
+
     pack.cultures[cultureId].center = cell;
     recalculateCultures();
-  });
+  }
+
+  const dragDebounced = debounce(handleDrag, 50);
+  d3.event.on("drag", dragDebounced);
 }
 
 function toggleLegend() {
@@ -630,7 +637,7 @@ function togglePercentageMode() {
 
 async function showHierarchy() {
   if (customization) return;
-  const HeirarchyTree = await import("../hierarchy-tree.js?v=1.87.01");
+  const HeirarchyTree = await import("../hierarchy-tree.js?v=1.88.06");
 
   const getDescription = culture => {
     const {name, type, rural, urban} = culture;
@@ -660,20 +667,13 @@ async function showHierarchy() {
   });
 }
 
-function recalculateCultures(must) {
-  if (!must && !culturesAutoChange.checked) return;
-
-  pack.cells.culture = new Uint16Array(pack.cells.i.length);
-  pack.cultures.forEach(function (c) {
-    if (!c.i || c.removed) return;
-    pack.cells.culture[c.center] = c.i;
-  });
-
-  Cultures.expand();
-  drawCultures();
-  pack.burgs.forEach(b => (b.culture = pack.cells.culture[b.cell]));
-  refreshCulturesEditor();
-  document.querySelector("input.cultureExpan").focus(); // to not trigger hotkeys
+function recalculateCultures(force) {
+  if (force || culturesAutoChange.checked) {
+    Cultures.expand();
+    drawCultures();
+    pack.burgs.forEach(b => (b.culture = pack.cells.culture[b.cell]));
+    refreshCulturesEditor();
+  }
 }
 
 function enterCultureManualAssignent() {
@@ -822,6 +822,7 @@ function addCulture() {
 
   if (pack.cells.h[center] < 20)
     return tip("You cannot place culture center into the water. Please click on a land cell", false, "error");
+
   const occupied = pack.cultures.some(c => !c.removed && c.center === center);
   if (occupied) return tip("This cell is already a culture center. Please select a different cell", false, "error");
 
@@ -857,8 +858,19 @@ function closeCulturesEditor() {
 }
 
 async function uploadCulturesData() {
-  const csv = await Formats.csvParser(this.files[0]);
+  const file = this.files[0];
   this.value = "";
+  const csv = await file.text();
+  const data = d3.csvParse(csv, d => ({
+    i: +d.Id,
+    name: d.Name,
+    color: d.Color,
+    expansionism: +d.Expansionism,
+    type: d.Type,
+    population: +d.Population,
+    emblemsShape: d["Emblems Shape"],
+    origins: d.Origins
+  }));
 
   const {cultures, cells} = pack;
   const shapes = Object.keys(COA.shields.types)
@@ -870,20 +882,26 @@ async function uploadCulturesData() {
     if (item.i) item.removed = true;
   });
 
-  for (const c of csv.iterator((a, b) => +a[0] > +b[0])) {
+  for (const culture of data) {
     let current;
-    if (+c.id < cultures.length) {
-      current = cultures[c.id];
+    if (culture.i < cultures.length) {
+      current = cultures[culture.i];
 
       const ratio = current.urban / (current.rural + current.urban);
-      applyPopulationChange(current.rural, current.urban, c.population * (1 - ratio), c.population * ratio, +c.id);
+      applyPopulationChange(
+        current.rural,
+        current.urban,
+        culture.population * (1 - ratio),
+        culture.population * ratio,
+        culture.i
+      );
     } else {
       current = {i: cultures.length, center: ra(populated), area: 0, cells: 0, origin: 0, rural: 0, urban: 0};
       cultures.push(current);
     }
 
     current.removed = false;
-    current.name = c.name;
+    current.name = culture.name;
 
     if (current.i) {
       current.code = abbreviate(
@@ -891,10 +909,10 @@ async function uploadCulturesData() {
         cultures.map(c => c.code)
       );
 
-      current.color = c.color;
-      current.expansionism = +c.expansionism;
+      current.color = culture.color;
+      current.expansionism = +culture.expansionism;
 
-      if (cultureTypes.includes(c.type)) current.type = c.type;
+      if (cultureTypes.includes(culture.type)) current.type = culture.type;
       else current.type = "Generic";
     }
 
@@ -913,13 +931,11 @@ async function uploadCulturesData() {
       current.origins = originIds.filter(id => id !== null);
       if (!current.origins.length) current.origins = [0];
     }
-    c.origins = current.i ? restoreOrigins(c.origins) : [null];
 
-    const shieldShape = c["emblems shape"].toLowerCase();
-    if (shapes.includes(shieldShape)) current.shield = shieldShape;
-    else current.shield = "heater";
+    culture.origins = current.i ? restoreOrigins(culture.origins || "") : [null];
+    current.shield = shapes.includes(culture.emblemsShape) ? culture.emblemsShape : "heater";
 
-    const nameBaseIndex = nameBases.findIndex(n => n.name == c.namesbase);
+    const nameBaseIndex = nameBases.findIndex(n => n.name == culture.namesbase);
     current.base = nameBaseIndex === -1 ? 0 : nameBaseIndex;
   }
 
@@ -927,4 +943,16 @@ async function uploadCulturesData() {
 
   drawCultures();
   refreshCulturesEditor();
+}
+
+function updateLockStatus() {
+  if (customization) return;
+
+  const cultureId = +this.parentNode.dataset.id;
+  const classList = this.classList;
+  const c = pack.cultures[cultureId];
+  c.lock = !c.lock;
+
+  classList.toggle("icon-lock-open");
+  classList.toggle("icon-lock");
 }

@@ -28,8 +28,11 @@ function editHeightmap(options) {
     <p><i>Erase</i> mode also allows you Convert an Image into a heightmap or use Template Editor.</p>
     <p>You can <i>keep</i> the data, but you won't be able to change the coastline.</p>
     <p>Try <i>risk</i> mode to change the coastline and keep the data. The data will be restored as much as possible, but it can cause unpredictable errors.</p>
-    <p>Please <span class="pseudoLink" onclick="dowloadMap();">save the map</span> before editing the heightmap!</p>
-    <p style="margin-bottom: 0">Check out ${link("https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Heightmap-customization", "wiki")} for guidance.</p>`;
+    <p>Please <span class="pseudoLink" onclick="saveMap('machine')">save the map</span> before editing the heightmap!</p>
+    <p style="margin-bottom: 0">Check out ${link(
+      "https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Heightmap-customization",
+      "wiki"
+    )} for guidance.</p>`;
 
     $("#alert").dialog({
       resizable: false,
@@ -127,6 +130,12 @@ function editHeightmap(options) {
     // move radius circle if drag mode is active
     const pressed = byId("brushesButtons").querySelector("button.pressed");
     if (!pressed) return;
+
+    if (pressed.id === "brushLine") {
+      debug.select("line").attr("x2", x).attr("y2", y);
+      return;
+    }
+
     moveCircle(x, y, brushRadius.valueAsNumber, "#333");
   }
 
@@ -148,7 +157,11 @@ function editHeightmap(options) {
   // Exit customization mode
   function finalizeHeightmap() {
     if (viewbox.select("#heights").selectAll("*").size() < 200)
-      return tip("Insufficient land area! There should be at least 200 land cells to finalize the heightmap", null, "error");
+      return tip(
+        "Insufficient land area! There should be at least 200 land cells to finalize the heightmap",
+        null,
+        "error"
+      );
     if (byId("imageConverter").offsetParent) return tip("Please exit the Image Conversion mode first", null, "error");
 
     delete window.edits; // remove global variable
@@ -174,23 +187,32 @@ function editHeightmap(options) {
     else if (mode === "risk") restoreRiskedData();
 
     // restore initial layers
-    //viewbox.select("#heights").remove();
     byId("heights").remove();
     turnButtonOff("toggleHeight");
     document
       .getElementById("mapLayers")
       .querySelectorAll("li")
-      .forEach(function (e) {
-        if (editHeightmap.layers.includes(e.id) && !layerIsOn(e.id)) e.click();
-        // turn on
-        else if (!editHeightmap.layers.includes(e.id) && layerIsOn(e.id)) e.click(); // turn off
+      .forEach(e => {
+        const wasOn = editHeightmap.layers.includes(e.id);
+        if ((wasOn && !layerIsOn(e.id)) || (!wasOn && layerIsOn(e.id))) e.click();
       });
+    if (!layerIsOn("toggleBorders")) borders.selectAll("path").remove();
+    if (!layerIsOn("toggleStates")) regions.selectAll("path").remove();
+    if (!layerIsOn("toggleRivers")) rivers.selectAll("*").remove();
+
     getCurrentPreset();
   }
 
   function regenerateErasedData() {
     INFO && console.group("Edit Heightmap");
     TIME && console.time("regenerateErasedData");
+
+    // remove data
+    pack.cultures = [];
+    pack.burgs = [];
+    pack.states = [];
+    pack.provinces = [];
+    pack.religions = [];
 
     const erosionAllowed = allowErosion.checked;
     markFeatures();
@@ -210,16 +232,19 @@ function editHeightmap(options) {
     if (!erosionAllowed) {
       for (const i of pack.cells.i) {
         const g = pack.cells.g[i];
-        if (pack.cells.h[i] !== grid.cells.h[g] && pack.cells.h[i] >= 20 === grid.cells.h[g] >= 20) pack.cells.h[i] = grid.cells.h[g];
+        if (pack.cells.h[i] !== grid.cells.h[g] && pack.cells.h[i] >= 20 === grid.cells.h[g] >= 20)
+          pack.cells.h[i] = grid.cells.h[g];
       }
     }
 
     drawRivers();
     Lakes.defineGroup();
-    defineBiomes();
+    Biomes.define();
     rankCells();
+
     Cultures.generate();
     Cultures.expand();
+
     BurgsAndStates.generate();
     Religions.generate();
     BurgsAndStates.defineStateForms();
@@ -228,7 +253,7 @@ function editHeightmap(options) {
 
     drawStates();
     drawBorders();
-    BurgsAndStates.drawStateLabels();
+    drawStateLabels();
 
     Rivers.specify();
     Lakes.generateName();
@@ -348,15 +373,18 @@ function editHeightmap(options) {
       const g = pack.cells.g[i];
       const isLand = pack.cells.h[i] >= 20;
 
-      // check biome
-      pack.cells.biome[i] = isLand && biome[g] ? biome[g] : getBiomeId(grid.cells.prec[g], grid.cells.temp[g], pack.cells.h[i]);
-
       // rivers data
       if (!erosionAllowed) {
         pack.cells.r[i] = r[g];
         pack.cells.conf[i] = conf[g];
         pack.cells.fl[i] = fl[g];
       }
+
+      // check biome
+      pack.cells.biome[i] =
+        isLand && biome[g]
+          ? biome[g]
+          : Biomes.getId(grid.cells.prec[g], grid.cells.temp[g], pack.cells.h[i], Boolean(pack.cells.r[i]));
 
       if (!isLand) continue;
       pack.cells.culture[i] = culture[g];
@@ -373,7 +401,9 @@ function editHeightmap(options) {
     const findBurgCell = function (x, y) {
       let i = findCell(x, y);
       if (pack.cells.h[i] >= 20) return i;
-      const dist = pack.cells.c[i].map(c => (pack.cells.h[c] < 20 ? Infinity : (pack.cells.p[c][0] - x) ** 2 + (pack.cells.p[c][1] - y) ** 2));
+      const dist = pack.cells.c[i].map(c =>
+        pack.cells.h[c] < 20 ? Infinity : (pack.cells.p[c][0] - x) ** 2 + (pack.cells.p[c][1] - y) ** 2
+      );
       return pack.cells.c[i][d3.scan(dist)];
     };
 
@@ -412,7 +442,7 @@ function editHeightmap(options) {
       c.center = findCell(c.x, c.y);
     }
 
-    BurgsAndStates.drawStateLabels();
+    drawStateLabels();
     drawStates();
     drawBorders();
 
@@ -483,10 +513,8 @@ function editHeightmap(options) {
 
     selection.forEach(function (i) {
       let cell = viewbox.select("#heights").select("#cell" + i);
-      if (!ocean && grid.cells.h[i] < 20) {
-        cell.remove();
-        return;
-      }
+      if (!ocean && grid.cells.h[i] < 20) return cell.remove();
+
       if (!cell.size())
         cell = viewbox
           .select("#heights")
@@ -583,24 +611,81 @@ function editHeightmap(options) {
 
     function exitBrushMode() {
       const pressed = document.querySelector("#brushesButtons > button.pressed");
-      if (!pressed) return;
-      pressed.classList.remove("pressed");
+      if (pressed) pressed.classList.remove("pressed");
 
-      viewbox.style("cursor", "default").on(".drag", null);
+      viewbox.style("cursor", "default").on(".drag", null).on("click", clicked);
+      debug.selectAll(".lineCircle").remove();
       removeCircle();
+
       byId("brushesSliders").style.display = "none";
+      byId("lineSlider").style.display = "none";
     }
 
     const dragBrushThrottled = throttle(dragBrush, 100);
-    function toggleBrushMode(e) {
-      if (e.target.classList.contains("pressed")) {
+
+    function toggleBrushMode(event) {
+      if (event.target.classList.contains("pressed")) {
         exitBrushMode();
         return;
       }
+
       exitBrushMode();
-      byId("brushesSliders").style.display = "block";
-      e.target.classList.add("pressed");
-      viewbox.style("cursor", "crosshair").call(d3.drag().on("start", dragBrushThrottled));
+      event.target.classList.add("pressed");
+
+      if (event.target.id === "brushLine") {
+        byId("lineSlider").style.display = "block";
+        viewbox.style("cursor", "crosshair").on("click", placeLinearFeature);
+      } else {
+        byId("brushesSliders").style.display = "block";
+        viewbox.style("cursor", "crosshair").call(d3.drag().on("start", dragBrushThrottled));
+      }
+    }
+
+    function placeLinearFeature() {
+      const [x, y] = d3.mouse(this);
+      const toCell = findGridCell(x, y, grid);
+
+      const lineCircle = debug.selectAll(".lineCircle");
+      if (!lineCircle.size()) {
+        // first click: add 1st control point
+        debug.append("line").attr("id", "brushCircle").attr("x1", x).attr("y1", y).attr("x2", x).attr("y2", y);
+
+        debug
+          .append("circle")
+          .attr("data-cell", toCell)
+          .attr("class", "lineCircle")
+          .attr("r", 6)
+          .attr("cx", x)
+          .attr("cy", y)
+          .attr("fill", "yellow")
+          .attr("stroke", "#333")
+          .attr("stroke-width", 2);
+        return;
+      }
+
+      // second click: execute operation and remove control points
+      const fromCell = +lineCircle.attr("data-cell");
+      debug.selectAll("*").remove();
+
+      const power = byId("linePower").valueAsNumber;
+      if (power === 0) return tip("Power should not be zero", false, "error");
+
+      const heights = grid.cells.h;
+      const operation = power > 0 ? HeightmapGenerator.addRange : HeightmapGenerator.addTrough;
+      HeightmapGenerator.setGraph(grid);
+      operation("1", String(Math.abs(power)), null, null, fromCell, toCell);
+      const changedHeights = HeightmapGenerator.getHeights();
+
+      let selection = [];
+      for (let i = 0; i < heights.length; i++) {
+        if (changedHeights[i] === heights[i]) continue;
+        if (changeOnlyLand.checked && heights[i] < 20) continue;
+        heights[i] = changedHeights[i];
+        selection.push(i);
+      }
+
+      mockHeightmapSelection(selection);
+      updateHistory();
     }
 
     function dragBrush() {
@@ -621,27 +706,44 @@ function editHeightmap(options) {
       d3.event.on("end", updateHeightmap);
     }
 
-    function changeHeightForSelection(s, start) {
+    function changeHeightForSelection(selection, start) {
       const power = brushPower.valueAsNumber;
+
       const interpolate = d3.interpolateRound(power, 1);
       const land = changeOnlyLand.checked;
       const lim = v => minmax(v, land ? 20 : 0, 100);
-      const h = grid.cells.h;
+      const heights = grid.cells.h;
 
       const brush = document.querySelector("#brushesButtons > button.pressed").id;
-      if (brush === "brushRaise") s.forEach(i => (h[i] = h[i] < 20 ? 20 : lim(h[i] + power)));
-      else if (brush === "brushElevate") s.forEach((i, d) => (h[i] = lim(h[i] + interpolate(d / Math.max(s.length - 1, 1)))));
-      else if (brush === "brushLower") s.forEach(i => (h[i] = lim(h[i] - power)));
-      else if (brush === "brushDepress") s.forEach((i, d) => (h[i] = lim(h[i] - interpolate(d / Math.max(s.length - 1, 1)))));
-      else if (brush === "brushAlign") s.forEach(i => (h[i] = lim(h[start])));
-      else if (brush === "brushSmooth")
-        s.forEach(
-          i => (h[i] = rn((d3.mean(grid.cells.c[i].filter(i => (land ? h[i] >= 20 : 1)).map(c => h[c])) + h[i] * (10 - power) + 0.6) / (11 - power), 1))
+      if (brush === "brushRaise") selection.forEach(i => (heights[i] = heights[i] < 20 ? 20 : lim(heights[i] + power)));
+      else if (brush === "brushElevate")
+        selection.forEach(
+          (i, d) => (heights[i] = lim(heights[i] + interpolate(d / Math.max(selection.length - 1, 1))))
         );
-      else if (brush === "brushDisrupt") s.forEach(i => (h[i] = h[i] < 15 ? h[i] : lim(h[i] + power / 1.6 - Math.random() * power)));
+      else if (brush === "brushLower") selection.forEach(i => (heights[i] = lim(heights[i] - power)));
+      else if (brush === "brushDepress")
+        selection.forEach(
+          (i, d) => (heights[i] = lim(heights[i] - interpolate(d / Math.max(selection.length - 1, 1))))
+        );
+      else if (brush === "brushAlign") selection.forEach(i => (heights[i] = lim(heights[start])));
+      else if (brush === "brushSmooth")
+        selection.forEach(
+          i =>
+            (heights[i] = rn(
+              (d3.mean(grid.cells.c[i].filter(i => (land ? heights[i] >= 20 : 1)).map(c => heights[c])) +
+                heights[i] * (10 - power) +
+                0.6) /
+                (11 - power),
+              1
+            ))
+        );
+      else if (brush === "brushDisrupt")
+        selection.forEach(
+          i => (heights[i] = heights[i] < 15 ? heights[i] : lim(heights[i] + power / 1.6 - Math.random() * power))
+        );
 
-      mockHeightmapSelection(s);
-      // updateHistory(); uncomment to update history every step
+      mockHeightmapSelection(selection);
+      // updateHistory(); uncomment to update history on every step
     }
 
     function changeOnlyLandClick(e) {
@@ -662,7 +764,8 @@ function editHeightmap(options) {
       const operator = conditionSign.value;
       const operand = rescaleModifier.valueAsNumber;
       if (Number.isNaN(operand)) return tip("Operand should be a number", false, "error");
-      if ((operator === "add" || operator === "subtract") && !Number.isInteger(operand)) return tip("Operand should be an integer", false, "error");
+      if ((operator === "add" || operator === "subtract") && !Number.isInteger(operand))
+        return tip("Operand should be an integer", false, "error");
 
       HeightmapGenerator.setGraph(grid);
 
@@ -691,7 +794,8 @@ function editHeightmap(options) {
     function startFromScratch() {
       if (changeOnlyLand.checked) return tip("Not allowed when 'Change only land cells' mode is set", false, "error");
       const someHeights = grid.cells.h.some(h => h);
-      if (!someHeights) return tip("Heightmap is already cleared, please do not click twice if not required", false, "error");
+      if (!someHeights)
+        return tip("Heightmap is already cleared, please do not click twice if not required", false, "error");
 
       grid.cells.h = new Uint8Array(grid.cells.i.length);
       viewbox.select("#heights").selectAll("*").remove();
@@ -714,7 +818,12 @@ function editHeightmap(options) {
     if (modules.openTemplateEditor) return;
     modules.openTemplateEditor = true;
 
-    $("#templateBody").sortable({items: "> div", handle: ".icon-resize-vertical", containment: "#templateBody", axis: "y"});
+    $("#templateBody").sortable({
+      items: "> div",
+      handle: ".icon-resize-vertical",
+      containment: "#templateBody",
+      axis: "y"
+    });
 
     // add listeners
     $body.on("click", function (ev) {
@@ -788,22 +897,31 @@ function editHeightmap(options) {
       const common = /* html */ `<div data-type="${type}">${Hide}<div style="width:4em">${type}</div>${Trash}${Reorder}`;
 
       const TempY = /* html */ `<span>y:
-          <input class="templateY" data-tip="Placement range percentage along Y axis (minY-maxY)" value=${arg5 || "20-80"} />
+          <input class="templateY" data-tip="Placement range percentage along Y axis (minY-maxY)" value=${
+            arg5 || "20-80"
+          } />
         </span>`;
 
       const TempX = /* html */ `<span>x:
-          <input class="templateX" data-tip="Placement range percentage along X axis (minX-maxX)" value=${arg4 || "15-85"} />
+          <input class="templateX" data-tip="Placement range percentage along X axis (minX-maxX)" value=${
+            arg4 || "15-85"
+          } />
         </span>`;
 
       const Height = /* html */ `<span>h:
-          <input class="templateHeight" data-tip="Blob maximum height, use hyphen to get a random number in range" value=${arg3 || "40-50"} />
+          <input class="templateHeight" data-tip="Blob maximum height, use hyphen to get a random number in range" value=${
+            arg3 || "40-50"
+          } />
         </span>`;
 
       const Count = /* html */ `<span>n:
-          <input class="templateCount" data-tip="Blobs to add, use hyphen to get a random number in range" value=${count || "1-2"} />
+          <input class="templateCount" data-tip="Blobs to add, use hyphen to get a random number in range" value=${
+            count || "1-2"
+          } />
         </span>`;
 
-      if (type === "Hill" || type === "Pit" || type === "Range" || type === "Trough") return /* html */ `${common}${TempY}${TempX}${Height}${Count}</div>`;
+      if (type === "Hill" || type === "Pit" || type === "Range" || type === "Trough")
+        return /* html */ `${common}${TempY}${TempX}${Height}${Count}</div>`;
 
       if (type === "Strait")
         return /* html */ `${common}
@@ -814,7 +932,9 @@ function editHeightmap(options) {
             </select>
           </span>
           <span>w:
-            <input class="templateCount" data-tip="Strait width, use hyphen to get a random number in range" value=${count || "2-7"} />
+            <input class="templateCount" data-tip="Strait width, use hyphen to get a random number in range" value=${
+              count || "2-7"
+            } />
           </span>
         </div>`;
 
@@ -935,8 +1055,10 @@ function editHeightmap(options) {
       const steps = byId("templateBody").querySelectorAll("#templateBody > div");
       if (!steps.length) return;
 
-      const seed = byId("templateSeed").value;
-      if (seed) Math.random = aleaPRNG(seed);
+      const currentSeed = byId("templateSeed").value;
+      const seed = (locked("templateSeed") && currentSeed) || generateSeed();
+      Math.random = aleaPRNG(seed);
+      byId("templateSeed").value = seed;
 
       grid.cells.h = createTypedArray({maxValue: 100, length: grid.points.length});
       HeightmapGenerator.setGraph(grid);
@@ -1135,7 +1257,7 @@ function editHeightmap(options) {
         .on("click", mapClicked);
 
       const colors = pallete.map(p => `rgb(${p[0]}, ${p[1]}, ${p[2]})`);
-      d3.select("#colorsUnassigned")
+      d3.select("#colorsUnassignedContainer")
         .selectAll("div")
         .data(colors)
         .enter()
@@ -1198,25 +1320,23 @@ function editHeightmap(options) {
           this.setAttribute("data-height", height);
         });
 
-      if (selectedColor.parentNode.id === "colorsUnassigned") {
-        colorsAssigned.appendChild(selectedColor);
+      if (selectedColor.parentNode.id === "colorsUnassignedContainer") {
+        colorsAssignedContainer.appendChild(selectedColor);
         colorsAssigned.style.display = "block";
 
-        byId("colorsUnassignedNumber").innerHTML = colorsUnassigned.childElementCount - 2;
-        byId("colorsAssignedNumber").innerHTML = colorsAssigned.childElementCount - 2;
+        byId("colorsUnassignedNumber").innerHTML = colorsUnassignedContainer.childElementCount - 2;
+        byId("colorsAssignedNumber").innerHTML = colorsAssignedContainer.childElementCount - 2;
       }
     }
 
     // auto assign color based on luminosity or hue
     function autoAssing(type) {
-      let unassigned = colorsUnassigned.querySelectorAll("div");
+      let unassigned = colorsUnassignedContainer.querySelectorAll("div");
       if (!unassigned.length) {
         heightsFromImage(+convertColors.value);
-        unassigned = colorsUnassigned.querySelectorAll("div");
-        if (!unassigned.length) {
-          tip("No unassigned colors. Please load an image and click the button again", false, "error");
-          return;
-        }
+        unassigned = colorsUnassignedContainer.querySelectorAll("div");
+        if (!unassigned.length)
+          return tip("No unassigned colors. Please load an image and click the button again", false, "error");
       }
 
       const getHeightByHue = function (color) {
@@ -1245,7 +1365,8 @@ function editHeightmap(options) {
       const assinged = []; // store assigned heights
       unassigned.forEach(el => {
         const clr = el.dataset.color;
-        const height = type === "hue" ? getHeightByHue(clr) : type === "lum" ? getHeightByLum(clr) : getHeightByScheme(clr);
+        const height =
+          type === "hue" ? getHeightByHue(clr) : type === "lum" ? getHeightByLum(clr) : getHeightByScheme(clr);
         const colorTo = color(1 - (height < 20 ? (height - 5) / 100 : height / 100));
         viewbox
           .select("#heights")
@@ -1259,18 +1380,18 @@ function editHeightmap(options) {
         } // if color is already added, remove it
         el.style.backgroundColor = el.dataset.color = colorTo;
         el.dataset.height = height;
-        colorsAssigned.appendChild(el);
+        colorsAssignedContainer.appendChild(el);
         assinged[height] = true;
       });
 
       // sort assigned colors by height
-      Array.from(colorsAssigned.children)
+      Array.from(colorsAssignedContainer.children)
         .sort((a, b) => +a.dataset.height - +b.dataset.height)
-        .forEach(line => colorsAssigned.appendChild(line));
+        .forEach(line => colorsAssignedContainer.appendChild(line));
 
       colorsAssigned.style.display = "block";
       colorsUnassigned.style.display = "none";
-      byId("colorsAssignedNumber").innerHTML = colorsAssigned.childElementCount - 2;
+      byId("colorsAssignedNumber").innerHTML = colorsAssignedContainer.childElementCount - 2;
     }
 
     function setConvertColorsNumber() {
@@ -1290,7 +1411,8 @@ function editHeightmap(options) {
     }
 
     function applyConversion() {
-      if (colorsAssigned.childElementCount < 3) return tip("Please do the assignment first", false, "error");
+      if (colorsAssignedContainer.childElementCount < 3)
+        return tip("Please assign colors to heights first", false, "error");
 
       viewbox
         .select("#heights")
