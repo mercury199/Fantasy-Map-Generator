@@ -1478,7 +1478,7 @@ function rankCells() {
 }
 
 // generate zones
-function addZones(number = 1) {
+function addZones(number = 3) {
   TIME && console.time("addZones");
   const {cells, states, burgs} = pack;
   const used = new Uint8Array(cells.i.length); // to store used cells
